@@ -4,12 +4,12 @@
 
 ### Project Setup
 
-- [ ] **Initialize Go module**
+- [x] **Initialize Go module**
   - `go mod init clean-go-fiber`
   - Set up Go version (1.22+)
   - Add `.gitignore` for Go
 
-- [ ] **Install core dependencies**
+- [x] **Install core dependencies**
   - `gofiber/fiber/v2` — HTTP framework
   - `gorm.io/gorm` + `gorm.io/driver/postgres` — ORM
   - `redis/go-redis/v9` — Redis client
@@ -20,13 +20,13 @@
   - `hibiken/asynq` — Background job queue (BullMQ equivalent)
   - `gofiber/swagger` + `swaggo/swag` — OpenAPI/Swagger docs
 
-- [ ] **Set up project folder structure**
+- [x] **Set up project folder structure**
   - Clean architecture layout (see `steps.md`)
   - Separate `cmd/` for server and worker entrypoints
 
 ### Configuration Management
 
-- [ ] **Create `.env.example`**
+- [x] **Create `.env.example`**
   - App: `APP_NAME`, `APP_PORT`, `APP_ENV`, `APP_KEY`, `APP_URL`
   - JWT: `JWT_SECRET`, `JWT_EXPIRY`
   - Database: `DATABASE_URL`, `DB_MAX_OPEN`, `DB_MAX_IDLE`
@@ -34,7 +34,7 @@
   - Mail: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM`
   - CORS: `CORS_ORIGIN`, `CORS_METHODS`
 
-- [ ] **Implement config loading with validation**
+- [x] **Implement config loading with validation**
   - `internal/config/` package
   - Validate required env vars at startup (fail fast)
   - Typed config structs (AppConfig, DBConfig, RedisConfig, etc.)
@@ -258,28 +258,28 @@
 ## 📊 Feature Parity Matrix (vs clean-elysia / clean-hono)
 
 | Feature                    | clean-elysia | clean-hono | clean-go-fiber |
-|----------------------------|:---:|:---:|:---:|
-| JWT Authentication         | ✅ | ✅ | ⬜ |
-| RBAC (Roles + Permissions) | ✅ | ✅ | ⬜ |
-| OpenAPI / Swagger Docs     | ✅ | ✅ | ⬜ |
-| Email Verification Flow    | ✅ | ✅ | ⬜ |
-| Password Reset Flow        | ✅ | ✅ | ⬜ |
-| Background Jobs (Queue)    | ✅ | ✅ | ⬜ |
-| PostgreSQL (GORM/Drizzle)  | ✅ | ✅ | ⬜ |
-| Redis Cache                | ✅ | ✅ | ⬜ |
-| Rate Limiting              | ✅ | ✅ | ⬜ |
-| Security Headers           | ✅ | ✅ | ⬜ |
-| CORS                       | ✅ | ✅ | ⬜ |
-| Body Limit                 | ✅ | ✅ | ⬜ |
-| Request ID                 | ✅ | ✅ | ⬜ |
-| Structured Logging         | ✅ | ✅ | ⬜ |
-| Performance Monitoring     | ✅ | ✅ | ⬜ |
-| DI Container               | ✅ | ✅ | ⬜ |
-| Docker + docker-compose    | ✅ | ✅ | ⬜ |
-| Makefile                   | ✅ | ✅ | ⬜ |
-| Hot Reload (dev)           | ✅ | ✅ | ⬜ |
-| Env Validation             | ✅ | ✅ | ⬜ |
-| Unit Tests                 | ❌ | ❌ | ⬜ |
+| -------------------------- | :----------: | :--------: | :------------: |
+| JWT Authentication         |      ✅      |     ✅     |       ⬜       |
+| RBAC (Roles + Permissions) |      ✅      |     ✅     |       ⬜       |
+| OpenAPI / Swagger Docs     |      ✅      |     ✅     |       ⬜       |
+| Email Verification Flow    |      ✅      |     ✅     |       ⬜       |
+| Password Reset Flow        |      ✅      |     ✅     |       ⬜       |
+| Background Jobs (Queue)    |      ✅      |     ✅     |       ⬜       |
+| PostgreSQL (GORM/Drizzle)  |      ✅      |     ✅     |       ⬜       |
+| Redis Cache                |      ✅      |     ✅     |       ⬜       |
+| Rate Limiting              |      ✅      |     ✅     |       ⬜       |
+| Security Headers           |      ✅      |     ✅     |       ⬜       |
+| CORS                       |      ✅      |     ✅     |       ⬜       |
+| Body Limit                 |      ✅      |     ✅     |       ⬜       |
+| Request ID                 |      ✅      |     ✅     |       ⬜       |
+| Structured Logging         |      ✅      |     ✅     |       ⬜       |
+| Performance Monitoring     |      ✅      |     ✅     |       ⬜       |
+| DI Container               |      ✅      |     ✅     |       ⬜       |
+| Docker + docker-compose    |      ✅      |     ✅     |       ⬜       |
+| Makefile                   |      ✅      |     ✅     |       ⬜       |
+| Hot Reload (dev)           |      ✅      |     ✅     |       ⬜       |
+| Env Validation             |      ✅      |     ✅     |       ⬜       |
+| Unit Tests                 |      ❌      |     ❌     |       ⬜       |
 
 ---
 
