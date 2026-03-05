@@ -23,7 +23,7 @@ func loadDatabaseUrl() string {
 	sslmode := getEnv("DB_SSLMODE", "disable")
 	timezone := getEnv("DB_TIMEZONE", "UTC")
 
-	return "postgres://" + user + ":" + password + "@" + host + ":" + port + "/" + dbname + "?sslmode=" + sslmode + "&timezone=" + timezone
+	return "host=" + host + " user=" + user + " password=" + password + " dbname=" + dbname + " port=" + port + " sslmode=" + sslmode + " TimeZone=" + timezone
 }
 
 func loadDatabase() DatabaseConfig {

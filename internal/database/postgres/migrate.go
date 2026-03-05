@@ -34,6 +34,7 @@ func Migrate() error {
 	if err != nil {
 		return fmt.Errorf("migrate: init migrator: %w", err)
 	}
+	defer m.Close()
 
 	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
 		return fmt.Errorf("migrate: apply migrations: %w", err)
