@@ -46,7 +46,7 @@
   - Auto-migration support
   - Transaction helpers
 
-- [ ] **Define database schemas/models**
+- [x] **Define database schemas/models**
   - `users` table — id, email, password, name, is_verified, is_superuser
   - `email_verifications` table — id, user_id, token, expires_at
   - `password_reset_tokens` table — id, user_id, token, expires_at

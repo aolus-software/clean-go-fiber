@@ -33,6 +33,7 @@ Before writing any code:
 | HTTP Framework   | Go Fiber v2                       |
 | ORM              | GORM                              |
 | Database         | PostgreSQL 16                     |
+| Migrations       | golang-migrate/migrate/v4         |
 | Cache / Queue    | Redis 7 (go-redis/v9 + Asynq)     |
 | Authentication   | golang-jwt/jwt/v5 (Bearer tokens) |
 | Validation       | go-playground/validator/v10       |
@@ -57,7 +58,8 @@ clean-go-fiber/
 │   ├── bootstrap/              # DI wiring — wires all layers together
 │   ├── config/                 # Env loading, typed config structs
 │   ├── database/
-│   │   ├── postgres/           # GORM connection, migrations, seeds
+│   │   ├── postgres/           # GORM connection + migrate.go runner
+│   │   │   └── migrations/     # SQL migration files (embedded into binary)
 │   │   └── redis/              # go-redis client
 │   ├── errors/                 # Custom AppError types
 │   ├── guards/                 # RoleGuard, PermissionGuard middleware
@@ -118,18 +120,30 @@ go mod tidy
 # 4. Generate Swagger docs
 make docs
 
-# 5. Run migrations and seed
-make migrate
-make seed
+# 5. Start dev server — migrations run automatically on startup
+make dev-server
 
-# 6. Start dev server (hot reload)
-make dev
-
-# 7. Start worker (separate terminal)
+# 6. Start worker (separate terminal)
 make dev-worker
 
-# 8. View API docs
+# 7. View API docs
 open http://localhost:3000/docs
+```
+
+### Database Migrations
+
+Migrations are plain SQL files in `internal/database/postgres/migrations/`, embedded into the binary via `embed.FS`. They run automatically on server startup via `postgres.Migrate()`. Already-applied migrations are skipped.
+
+```bash
+# Create a new migration file pair
+make migrate-create NAME=add_sessions_table
+# → generates 000002_add_sessions_table.up.sql and .down.sql
+```
+
+The `migrate` CLI must be installed:
+
+```bash
+go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 ```
 
 ---
@@ -161,8 +175,9 @@ open http://localhost:3000/docs
 ### 🗄️ Adding a new model
 
 1. Define struct in `internal/models/<name>.go` with GORM tags
-2. Add to the auto-migration list in `internal/database/postgres/migrate.go`
-3. Add seed data (idempotent) in `internal/database/postgres/seed/seed.go`
+2. Create a migration: `make migrate-create NAME=create_<name>_table`
+3. Write the `CREATE TABLE` SQL in the generated `.up.sql` file and rollback SQL in `.down.sql`
+4. Add seed data (idempotent) in `internal/database/postgres/seed/seed.go`
 
 ---
 
