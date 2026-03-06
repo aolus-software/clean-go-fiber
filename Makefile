@@ -46,4 +46,7 @@ migrate-force:
 	@test -n "$(VERSION)" || (echo "Error: VERSION is required. Usage: make migrate-force VERSION=<n>" && exit 1)
 	migrate -path $(MIGRATE_DIR) -database "$(MIGRATE_URL)" force $(VERSION)
 
-.PHONY: dev dev-server dev-worker migrate-create migrate-up migrate-down migrate-status migrate-force
+seed:
+	go run ./cmd/seed/main.go
+
+.PHONY: dev dev-server dev-worker migrate-create migrate-up migrate-down migrate-status migrate-force seed

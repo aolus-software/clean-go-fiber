@@ -41,7 +41,7 @@
 
 ### Database Layer
 
-- [ ] **Set up GORM + PostgreSQL connection**
+- [x] **Set up GORM + PostgreSQL connection**
   - Connection pool (MaxOpenConns, MaxIdleConns, ConnMaxLifetime)
   - Auto-migration support
   - Transaction helpers
@@ -55,17 +55,17 @@
   - `role_permissions` table — pivot
   - `user_roles` table — pivot
 
-- [ ] **Create repository interfaces + implementations**
+- [x] **Create repository interfaces + implementations**
   - `UserRepository` — CRUD + find by email
   - `ForgotPasswordRepository` — token management
   - `RoleRepository` — role queries
   - `PermissionRepository` — permission queries
 
-- [ ] **Set up database migrations**
+- [x] **Set up database migrations**
   - Migration runner script
   - Initial migration files
 
-- [ ] **Create database seeder**
+- [x] **Create database seeder**
   - Seed default roles: admin, user
   - Seed default permissions
   - Seed superuser account
