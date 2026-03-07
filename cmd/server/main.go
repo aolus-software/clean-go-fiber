@@ -22,8 +22,13 @@ import (
 	"github.com/aolus-software/clean-go-fiber/internal/bootstrap"
 	"github.com/aolus-software/clean-go-fiber/internal/config"
 	"github.com/aolus-software/clean-go-fiber/internal/database/postgres"
+	"github.com/aolus-software/clean-go-fiber/internal/middleware"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/helmet"
+	"github.com/gofiber/fiber/v2/middleware/limiter"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+	"github.com/gofiber/fiber/v2/middleware/requestid"
 	"go.uber.org/zap"
 )
 
@@ -66,11 +71,20 @@ func main() {
 		},
 	})
 
+	app.Use(recover.New())
+	app.Use(requestid.New())
+	app.Use(helmet.New())
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: strings.Join(config.C.Cors.Host, ","),
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 		AllowMethods: strings.Join(config.C.Cors.Method, ","),
 	}))
+	app.Use(limiter.New(limiter.Config{
+		Max:        100,
+		Expiration: 1 * time.Minute,
+	}))
+	app.Use(middleware.Logger(logger))
+	app.Use(middleware.Performance(logger, 1*time.Second))
 
 	bootstrap.RegisterRoutes(app, db, config.C)
 

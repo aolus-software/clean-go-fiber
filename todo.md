@@ -92,7 +92,7 @@
   - Attach user info to Fiber context
   - Handle token expiry errors
 
-- [ ] **Implement RBAC guards**
+- [x] **Implement RBAC guards**
   - `RoleGuard` — check user role
   - `PermissionGuard` — check user permission
   - Superuser bypass
@@ -103,12 +103,12 @@
 
 ### Profile & Settings Modules
 
-- [ ] **Profile module**
+- [x] **Profile module**
   - `GET /api/profile/me` — get current user
   - `PATCH /api/profile/me` — update profile
   - `PATCH /api/profile/me/password` — change password
 
-- [ ] **Settings module**
+- [x] **Settings module**
   - `GET /api/settings/roles` — list roles
   - `POST /api/settings/roles` — create role
   - `GET /api/settings/roles/:id` — get role
@@ -128,19 +128,19 @@
 
 ### Middleware
 
-- [ ] **Request ID middleware** — attach unique ID to each request
-- [ ] **Structured logging middleware** — log method, path, status, duration (zap)
-- [ ] **Performance middleware** — warn on slow requests (>1s)
-- [ ] **CORS middleware** — configurable origins
-- [ ] **Rate limiting middleware** — global rate limit (Redis-backed)
-- [ ] **Security headers middleware** — equivalent of Helmet
-- [ ] **Body limit middleware** — max 100KB request body
-- [ ] **Recovery middleware** — panic recovery with error logging
-- [ ] **Error handler** — centralized error response formatting
+- [x] **Request ID middleware** — attach unique ID to each request
+- [x] **Structured logging middleware** — log method, path, status, duration (zap)
+- [x] **Performance middleware** — warn on slow requests (>1s)
+- [x] **CORS middleware** — configurable origins
+- [x] **Rate limiting middleware** — global rate limit (memory-backed, 100 req/min)
+- [x] **Security headers middleware** — equivalent of Helmet
+- [x] **Body limit middleware** — max 100KB request body
+- [x] **Recovery middleware** — panic recovery with error logging
+- [x] **Error handler** — centralized error response formatting
 
 ### Caching Layer
 
-- [ ] **Redis cache wrapper**
+- [x] **Redis cache wrapper**
   - `Get(key)`, `Set(key, value, ttl)`, `Delete(key)`, `Flush()`
   - `Remember(key, ttl, fn)` — cache-or-compute helper
   - Key generation helper (`generateKey(...parts)`)
@@ -148,19 +148,19 @@
 
 ### Background Jobs (Asynq)
 
-- [ ] **Set up Asynq client + server**
+- [x] **Set up Asynq client + server**
   - `cmd/worker/main.go` — separate worker process
   - Queue client for enqueuing tasks
   - Worker server for processing tasks
 
-- [ ] **Send email task**
+- [x] **Send email task**
   - Task type: `email:send`
   - Payload: to, subject, body, template
   - Handler with retry logic and error logging
 
 ### Email (Mailer)
 
-- [ ] **SMTP mailer setup**
+- [x] **SMTP mailer setup**
   - `internal/libs/mailer/` package
   - Send function with template support
   - Email templates: verify-email, reset-password, welcome
