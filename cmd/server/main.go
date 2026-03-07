@@ -22,7 +22,9 @@ import (
 	"github.com/aolus-software/clean-go-fiber/internal/bootstrap"
 	"github.com/aolus-software/clean-go-fiber/internal/config"
 	"github.com/aolus-software/clean-go-fiber/internal/database/postgres"
+	redisdb "github.com/aolus-software/clean-go-fiber/internal/database/redis"
 	"github.com/aolus-software/clean-go-fiber/internal/middleware"
+	"github.com/aolus-software/clean-go-fiber/internal/queue"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
@@ -51,6 +53,15 @@ func main() {
 		logger.Fatal("Failed to run migrations", zap.Error(err))
 	}
 	logger.Info("Database migrations applied")
+
+	redisClient, err := redisdb.Connect()
+	if err != nil {
+		logger.Fatal("Failed to connect to Redis", zap.Error(err))
+	}
+	logger.Info("Connected to Redis")
+
+	queueClient := queue.NewClient()
+	defer queueClient.Close()
 
 	app := fiber.New(fiber.Config{
 		BodyLimit:    100 * 1024,
@@ -86,7 +97,7 @@ func main() {
 	app.Use(middleware.Logger(logger))
 	app.Use(middleware.Performance(logger, 1*time.Second))
 
-	bootstrap.RegisterRoutes(app, db, config.C)
+	bootstrap.RegisterRoutes(app, db, redisClient, queueClient, config.C)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)

@@ -14,6 +14,7 @@ func (h *Handler) RegisterRoutes(router fiber.Router) {
 	auth.Post("/forgot-password", h.ForgotPassword)
 	auth.Post("/reset-password", h.ResetPassword)
 	auth.Post("/verify-email", h.VerifyEmail)
+	auth.Post("/resend-verification", h.ResendVerification)
 
 	auth.Get("/me", middleware.Auth(), h.Me)
 }

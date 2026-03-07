@@ -2,12 +2,15 @@ package roles
 
 import (
 	"context"
+	"time"
 
 	"github.com/aolus-software/clean-go-fiber/internal/errors"
+	"github.com/aolus-software/clean-go-fiber/internal/libs/cache"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/pagination"
 	"github.com/aolus-software/clean-go-fiber/internal/models"
 	"github.com/aolus-software/clean-go-fiber/internal/repositories"
 	"github.com/google/uuid"
+	rediscache "github.com/redis/go-redis/v9"
 )
 
 type Service interface {
@@ -22,10 +25,11 @@ type Service interface {
 type service struct {
 	roleRepo       repositories.RoleRepository
 	permissionRepo repositories.PermissionRepository
+	cache          *cache.Cache
 }
 
-func NewService(roleRepo repositories.RoleRepository, permissionRepo repositories.PermissionRepository) Service {
-	return &service{roleRepo: roleRepo, permissionRepo: permissionRepo}
+func NewService(roleRepo repositories.RoleRepository, permissionRepo repositories.PermissionRepository, c *cache.Cache) Service {
+	return &service{roleRepo: roleRepo, permissionRepo: permissionRepo, cache: c}
 }
 
 func (s *service) List(ctx context.Context, q *pagination.QueryParamDatatable) (*pagination.PaginationResponse[RoleResponse], error) {
@@ -51,11 +55,21 @@ func (s *service) GetByID(ctx context.Context, id string) (*RoleResponse, error)
 	if err != nil {
 		return nil, errors.NewBadRequestError("invalid role id")
 	}
+
+	key := cache.Key(cache.RoleByID, id)
+	var resp RoleResponse
+	if err := s.cache.Get(ctx, key, &resp); err == nil {
+		return &resp, nil
+	} else if err != rediscache.Nil {
+		return nil, errors.NewInternalServerError("cache error")
+	}
+
 	role, err := s.roleRepo.FindById(ctx, uid)
 	if err != nil {
 		return nil, errors.NewNotFoundError("role not found")
 	}
-	resp := toResponse(*role)
+	resp = toResponse(*role)
+	s.cache.Set(ctx, key, resp, 5*time.Minute)
 	return &resp, nil
 }
 
@@ -82,6 +96,7 @@ func (s *service) Update(ctx context.Context, id string, req *RoleRequest) (*Rol
 	if err != nil {
 		return nil, errors.NewInternalServerError("failed to update role")
 	}
+	s.cache.Delete(ctx, cache.Key(cache.RoleByID, id))
 	resp := toResponse(*updated)
 	return &resp, nil
 }
@@ -94,7 +109,11 @@ func (s *service) Delete(ctx context.Context, id string) error {
 	if _, err := s.roleRepo.FindById(ctx, uid); err != nil {
 		return errors.NewNotFoundError("role not found")
 	}
-	return s.roleRepo.Delete(ctx, uid)
+	if err := s.roleRepo.Delete(ctx, uid); err != nil {
+		return err
+	}
+	s.cache.Delete(ctx, cache.Key(cache.RoleByID, id))
+	return nil
 }
 
 func (s *service) SyncPermissions(ctx context.Context, id string, req *SyncPermissionsRequest) (*RoleResponse, error) {
@@ -121,6 +140,7 @@ func (s *service) SyncPermissions(ctx context.Context, id string, req *SyncPermi
 	if err := s.roleRepo.SyncPermissions(ctx, role, perms); err != nil {
 		return nil, errors.NewInternalServerError("failed to sync permissions")
 	}
+	s.cache.Delete(ctx, cache.Key(cache.RoleByID, id))
 	role.Permissions = perms
 	resp := toResponse(*role)
 	return &resp, nil

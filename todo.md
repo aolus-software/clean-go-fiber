@@ -218,13 +218,13 @@
 
 ### Docker & Deployment
 
-- [ ] **Create Dockerfile**
+- [x] **Create Dockerfile**
   - Multi-stage build (builder + runner)
   - Alpine base image
   - Build Go binary
   - Non-root user
 
-- [ ] **Create docker-compose.yml**
+- [x] **Create docker-compose.yml**
   - `postgres` service
   - `redis` service
   - `app` service (depends on postgres + redis)
@@ -232,7 +232,7 @@
   - `app_network` bridge network
   - Named volumes
 
-- [ ] **Create `.dockerignore`**
+- [x] **Create `.dockerignore`**
 
 ### Code Quality
 
@@ -272,18 +272,18 @@
 | OpenAPI / Swagger Docs     |      ✅      |     ✅     |       ✅       |
 | Email Verification Flow    |      ✅      |     ✅     |       ✅       |
 | Password Reset Flow        |      ✅      |     ✅     |       ✅       |
-| Background Jobs (Queue)    |      ✅      |     ✅     |       ⬜       |
+| Background Jobs (Queue)    |      ✅      |     ✅     |       ✅       |
 | PostgreSQL (GORM/Drizzle)  |      ✅      |     ✅     |       ✅       |
-| Redis Cache                |      ✅      |     ✅     |       ⬜       |
-| Rate Limiting              |      ✅      |     ✅     |       ⬜       |
-| Security Headers           |      ✅      |     ✅     |       ⬜       |
-| CORS                       |      ✅      |     ✅     |       ⬜       |
-| Body Limit                 |      ✅      |     ✅     |       ⬜       |
-| Request ID                 |      ✅      |     ✅     |       ⬜       |
-| Structured Logging         |      ✅      |     ✅     |       ⬜       |
-| Performance Monitoring     |      ✅      |     ✅     |       ⬜       |
+| Redis Cache                |      ✅      |     ✅     |       ✅       |
+| Rate Limiting              |      ✅      |     ✅     |       ✅       |
+| Security Headers           |      ✅      |     ✅     |       ✅       |
+| CORS                       |      ✅      |     ✅     |       ✅       |
+| Body Limit                 |      ✅      |     ✅     |       ✅       |
+| Request ID                 |      ✅      |     ✅     |       ✅       |
+| Structured Logging         |      ✅      |     ✅     |       ✅       |
+| Performance Monitoring     |      ✅      |     ✅     |       ✅       |
 | DI Container               |      ✅      |     ✅     |       ✅       |
-| Docker + docker-compose    |      ✅      |     ✅     |       ⬜       |
+| Docker + docker-compose    |      ✅      |     ✅     |       ✅       |
 | Makefile                   |      ✅      |     ✅     |       🔶       |
 | Hot Reload (dev)           |      ✅      |     ✅     |       ✅       |
 | Env Validation             |      ✅      |     ✅     |       ✅       |

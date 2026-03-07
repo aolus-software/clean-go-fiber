@@ -2,13 +2,18 @@ package permissions
 
 import (
 	"context"
+	"time"
 
 	"github.com/aolus-software/clean-go-fiber/internal/errors"
+	"github.com/aolus-software/clean-go-fiber/internal/libs/cache"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/pagination"
 	"github.com/aolus-software/clean-go-fiber/internal/models"
 	"github.com/aolus-software/clean-go-fiber/internal/repositories"
 	"github.com/google/uuid"
+	rediscache "github.com/redis/go-redis/v9"
 )
+
+const permissionCacheKey = "permission:id:%s"
 
 type Service interface {
 	List(ctx context.Context, q *pagination.QueryParamDatatable) (*pagination.PaginationResponse[PermissionResponse], error)
@@ -19,11 +24,12 @@ type Service interface {
 }
 
 type service struct {
-	repo repositories.PermissionRepository
+	repo  repositories.PermissionRepository
+	cache *cache.Cache
 }
 
-func NewService(repo repositories.PermissionRepository) Service {
-	return &service{repo: repo}
+func NewService(repo repositories.PermissionRepository, c *cache.Cache) Service {
+	return &service{repo: repo, cache: c}
 }
 
 func (s *service) List(ctx context.Context, q *pagination.QueryParamDatatable) (*pagination.PaginationResponse[PermissionResponse], error) {
@@ -49,11 +55,21 @@ func (s *service) GetByID(ctx context.Context, id string) (*PermissionResponse, 
 	if err != nil {
 		return nil, errors.NewBadRequestError("invalid permission id")
 	}
+
+	key := cache.Key(permissionCacheKey, id)
+	var resp PermissionResponse
+	if err := s.cache.Get(ctx, key, &resp); err == nil {
+		return &resp, nil
+	} else if err != rediscache.Nil {
+		return nil, errors.NewInternalServerError("cache error")
+	}
+
 	p, err := s.repo.FindById(ctx, uid)
 	if err != nil {
 		return nil, errors.NewNotFoundError("permission not found")
 	}
-	resp := toResponse(*p)
+	resp = toResponse(*p)
+	s.cache.Set(ctx, key, resp, 5*time.Minute)
 	return &resp, nil
 }
 
@@ -81,6 +97,7 @@ func (s *service) Update(ctx context.Context, id string, req *PermissionRequest)
 	if err != nil {
 		return nil, errors.NewInternalServerError("failed to update permission")
 	}
+	s.cache.Delete(ctx, cache.Key(permissionCacheKey, id))
 	resp := toResponse(*updated)
 	return &resp, nil
 }
@@ -93,7 +110,11 @@ func (s *service) Delete(ctx context.Context, id string) error {
 	if _, err := s.repo.FindById(ctx, uid); err != nil {
 		return errors.NewNotFoundError("permission not found")
 	}
-	return s.repo.Delete(ctx, uid)
+	if err := s.repo.Delete(ctx, uid); err != nil {
+		return err
+	}
+	s.cache.Delete(ctx, cache.Key(permissionCacheKey, id))
+	return nil
 }
 
 func toResponse(p models.Permission) PermissionResponse {

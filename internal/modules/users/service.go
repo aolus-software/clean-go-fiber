@@ -2,13 +2,16 @@ package users
 
 import (
 	"context"
+	"time"
 
 	"github.com/aolus-software/clean-go-fiber/internal/errors"
+	"github.com/aolus-software/clean-go-fiber/internal/libs/cache"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/pagination"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
 	"github.com/aolus-software/clean-go-fiber/internal/models"
 	"github.com/aolus-software/clean-go-fiber/internal/repositories"
 	"github.com/google/uuid"
+	rediscache "github.com/redis/go-redis/v9"
 )
 
 type Service interface {
@@ -23,10 +26,11 @@ type Service interface {
 type service struct {
 	userRepo repositories.UserRepository
 	roleRepo repositories.RoleRepository
+	cache    *cache.Cache
 }
 
-func NewService(userRepo repositories.UserRepository, roleRepo repositories.RoleRepository) Service {
-	return &service{userRepo: userRepo, roleRepo: roleRepo}
+func NewService(userRepo repositories.UserRepository, roleRepo repositories.RoleRepository, c *cache.Cache) Service {
+	return &service{userRepo: userRepo, roleRepo: roleRepo, cache: c}
 }
 
 func (s *service) List(ctx context.Context, q *pagination.QueryParamDatatable) (*pagination.PaginationResponse[UserResponse], error) {
@@ -52,11 +56,21 @@ func (s *service) GetByID(ctx context.Context, id string) (*UserResponse, error)
 	if err != nil {
 		return nil, errors.NewBadRequestError("invalid user id")
 	}
+
+	key := cache.Key(cache.UserByID, id)
+	var resp UserResponse
+	if err := s.cache.Get(ctx, key, &resp); err == nil {
+		return &resp, nil
+	} else if err != rediscache.Nil {
+		return nil, errors.NewInternalServerError("cache error")
+	}
+
 	user, err := s.userRepo.FindById(ctx, uid)
 	if err != nil {
 		return nil, errors.NewNotFoundError("user not found")
 	}
-	resp := toResponse(*user)
+	resp = toResponse(*user)
+	s.cache.Set(ctx, key, resp, 5*time.Minute)
 	return &resp, nil
 }
 
@@ -94,6 +108,7 @@ func (s *service) Update(ctx context.Context, id string, req *UpdateUserRequest)
 	if err != nil {
 		return nil, errors.NewInternalServerError("failed to update user")
 	}
+	s.cache.Delete(ctx, cache.Key(cache.UserByID, id))
 	resp := toResponse(*updated)
 	return &resp, nil
 }
@@ -106,7 +121,11 @@ func (s *service) Delete(ctx context.Context, id string) error {
 	if _, err := s.userRepo.FindById(ctx, uid); err != nil {
 		return errors.NewNotFoundError("user not found")
 	}
-	return s.userRepo.Delete(ctx, uid)
+	if err := s.userRepo.Delete(ctx, uid); err != nil {
+		return err
+	}
+	s.cache.Delete(ctx, cache.Key(cache.UserByID, id))
+	return nil
 }
 
 func (s *service) SyncRoles(ctx context.Context, id string, req *SyncRolesRequest) (*UserResponse, error) {
@@ -137,6 +156,7 @@ func (s *service) SyncRoles(ctx context.Context, id string, req *SyncRolesReques
 	if err := s.userRepo.SyncRoles(ctx, user, roles); err != nil {
 		return nil, errors.NewInternalServerError("failed to sync roles")
 	}
+	s.cache.Delete(ctx, cache.Key(cache.UserByID, id))
 	user.Roles = roles
 	resp := toResponse(*user)
 	return &resp, nil

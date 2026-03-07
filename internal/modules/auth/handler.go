@@ -176,6 +176,32 @@ func (h *Handler) VerifyEmail(c *fiber.Ctx) error {
 	return utils.OK(c, fiber.Map{"message": "email verified"})
 }
 
+// @Summary     Resend email verification
+// @Tags        auth
+// @Accept      json
+// @Produce     json
+// @Param       body  body      auth.ResendVerificationRequest  true  "Email address"
+// @Success     200   {object}  utils.Response
+// @Failure     400   {object}  utils.Response
+// @Failure     422   {object}  utils.Response
+// @Router      /auth/resend-verification [post]
+func (h *Handler) ResendVerification(c *fiber.Ctx) error {
+	var req ResendVerificationRequest
+	if err := c.BodyParser(&req); err != nil {
+		return fiber.ErrBadRequest
+	}
+	if err := validator.Validate(&req); err != nil {
+		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
+			"success": false,
+			"errors":  err,
+		})
+	}
+	if err := h.service.ResendVerification(c.Context(), &req); err != nil {
+		return err
+	}
+	return utils.OK(c, fiber.Map{"message": "if the email exists and is unverified, a new verification email has been sent"})
+}
+
 // @Summary     Get current user
 // @Tags        auth
 // @Produce     json

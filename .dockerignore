@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env
+.air.toml
+tmp/
+docs/
+*.md
+.agent/
+.claude/
+.gemini/
