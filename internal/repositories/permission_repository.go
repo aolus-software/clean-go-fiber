@@ -74,6 +74,7 @@ func (r *permissionRepository) FindAll(ctx context.Context, queryParams *paginat
 		Total:       total,
 		PerPage:     queryParams.PerPage,
 		CurrentPage: queryParams.Page,
+		LastPage:    pagination.CalcLastPage(total, queryParams.PerPage),
 		Data:        permissions,
 	}, nil
 }

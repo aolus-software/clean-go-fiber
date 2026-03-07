@@ -9,30 +9,28 @@ import (
 )
 
 type Config struct {
-	App AppConfig
+	App      AppConfig
 	Database DatabaseConfig
-	Redis RedisConfig
-	Mail MailConfig
-	Cors CorsConfig
-	Jwt JWTConfig
+	Redis    RedisConfig
+	Mail     MailConfig
+	Cors     CorsConfig
+	Jwt      JWTConfig
 }
 
 var C *Config
 
-
 func Load() {
 	if err := godotenv.Load(); err != nil {
-		log.Printf("No .env file found: %v", err)
-		panic("Failed to load .env file")
+		log.Printf("No .env file found, reading from environment: %v", err)
 	}
 
 	C = &Config{
-		App: loadApp(),
+		App:      loadApp(),
 		Database: loadDatabase(),
-		Redis: loadRedis(),
-		Mail: loadMail(),
-		Cors: loadCors(),
-		Jwt: loadJWT(),
+		Redis:    loadRedis(),
+		Mail:     loadMail(),
+		Cors:     loadCors(),
+		Jwt:      loadJWT(),
 	}
 }
 

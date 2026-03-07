@@ -11,11 +11,12 @@ import (
 func main() {
 	config.Load()
 
-	if _, err := postgres.Connect(); err != nil {
+	db, err := postgres.Connect()
+	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	if err := seed.Run(); err != nil {
+	if err := seed.Run(db); err != nil {
 		log.Fatalf("Failed to run seeders: %v", err)
 	}
 

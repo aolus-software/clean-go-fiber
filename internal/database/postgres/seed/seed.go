@@ -3,14 +3,12 @@ package seed
 import (
 	"fmt"
 
-	"github.com/aolus-software/clean-go-fiber/internal/database/postgres"
 	"github.com/aolus-software/clean-go-fiber/internal/models"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
-func Run() error {
-	db := postgres.DB
-
+func Run(db *gorm.DB) error {
 	permissions := []models.Permission{
 		{Name: "read", Modules: "users"},
 		{Name: "create", Modules: "users"},

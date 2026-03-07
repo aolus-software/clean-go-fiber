@@ -1,3 +1,6 @@
+docs:
+	swag init -g cmd/server/main.go -o docs
+
 dev:
 	$(MAKE) dev-server & $(MAKE) dev-worker
 
@@ -49,4 +52,4 @@ migrate-force:
 seed:
 	go run ./cmd/seed/main.go
 
-.PHONY: dev dev-server dev-worker migrate-create migrate-up migrate-down migrate-status migrate-force seed
+.PHONY: docs dev dev-server dev-worker migrate-create migrate-up migrate-down migrate-status migrate-force seed

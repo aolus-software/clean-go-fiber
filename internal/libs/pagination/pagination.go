@@ -3,7 +3,7 @@ package pagination
 import (
 	"fmt"
 
-	"github.com/gofiber/fiber/v2"
+	apperrors "github.com/aolus-software/clean-go-fiber/internal/errors"
 )
 
 type QueryParamDatatable struct {
@@ -19,6 +19,7 @@ type PaginationResponse[T any] struct {
 	Total       int64 `json:"total"`
 	PerPage     int   `json:"per_page"`
 	CurrentPage int   `json:"current_page"`
+	LastPage    int   `json:"last_page"`
 	Data        []T   `json:"data"`
 }
 
@@ -51,17 +52,24 @@ func (q *QueryParamDatatable) ApplyDefaults(options DatatableOptions) {
 
 func (q *QueryParamDatatable) Validate(options DatatableOptions) error {
 	if q.OrderBy != "" && !isAllowableSort(q.OrderBy, options) {
-		return fiber.NewError(fiber.StatusBadRequest, "The order_by field is invalid")
+		return apperrors.NewBadRequestError("The order_by field is invalid")
 	}
 	if q.SortDirection != "" && q.SortDirection != "asc" && q.SortDirection != "desc" {
-		return fiber.NewError(fiber.StatusBadRequest, "Invalid sort_direction field")
+		return apperrors.NewBadRequestError("Invalid sort_direction field")
 	}
 	for filter := range q.Filters {
 		if !isAllowableFilter(filter, options) {
-			return fiber.NewError(fiber.StatusBadRequest, fmt.Sprintf("Invalid filter field: %s", filter))
+			return apperrors.NewBadRequestError(fmt.Sprintf("Invalid filter field: %s", filter))
 		}
 	}
 	return nil
+}
+
+func CalcLastPage(total int64, perPage int) int {
+	if perPage <= 0 {
+		return 0
+	}
+	return int((total + int64(perPage) - 1) / int64(perPage))
 }
 
 func isAllowableSort(field string, options DatatableOptions) bool {

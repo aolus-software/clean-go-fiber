@@ -9,6 +9,18 @@ import (
 	"gorm.io/gorm"
 )
 
+type EmailVerificationRepository interface {
+	Create(ctx context.Context, ev *models.EmailVerification) (*models.EmailVerification, error)
+	FindByToken(ctx context.Context, token string) (*models.EmailVerification, error)
+	DeleteByUserID(ctx context.Context, userID uuid.UUID) error
+}
+
+type ForgotPasswordRepository interface {
+	Create(ctx context.Context, fp *models.ForgotPassword) (*models.ForgotPassword, error)
+	FindByToken(ctx context.Context, token string) (*models.ForgotPassword, error)
+	DeleteByUserID(ctx context.Context, userID uuid.UUID) error
+}
+
 type RoleRepository interface {
 	WithTx(tx *gorm.DB) RoleRepository
 	FindAll(ctx context.Context, queryParams *pagination.QueryParamDatatable) (*pagination.PaginationResponse[models.Role], error)

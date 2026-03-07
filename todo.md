@@ -72,7 +72,7 @@
 
 ### Authentication Module
 
-- [ ] **Implement auth routes + handlers**
+- [x] **Implement auth routes + handlers**
   - `POST /api/auth/login`
   - `POST /api/auth/register`
   - `POST /api/auth/verify-email`
@@ -81,13 +81,13 @@
   - `POST /api/auth/reset-password`
   - `POST /api/auth/refresh-token`
 
-- [ ] **Implement auth service**
+- [x] **Implement auth service**
   - Password hashing with bcrypt
   - JWT access + refresh token generation
   - Email verification logic
   - Password reset logic
 
-- [ ] **Implement JWT middleware**
+- [x] **Implement JWT middleware**
   - Extract and validate Bearer token
   - Attach user info to Fiber context
   - Handle token expiry errors
@@ -119,7 +119,7 @@
 
 ### API Documentation
 
-- [ ] **Set up Swagger/OpenAPI with swag**
+- [x] **Set up Swagger/OpenAPI with swag**
   - Install `swaggo/swag` CLI
   - Add doc annotations to all handlers
   - Serve Scalar-style UI or Swagger UI at `/docs`
@@ -167,14 +167,14 @@
 
 ### Dependency Injection
 
-- [ ] **Implement DI container**
+- [x] **Implement DI container**
   - Manual DI (constructor injection) or use `uber-go/fx`
   - Bootstrap function to wire all services
   - Inject repositories into services, services into handlers
 
 ### Custom Error Types
 
-- [ ] **Define error types**
+- [x] **Define error types**
   - `BadRequestError` (400)
   - `UnauthorizedError` (401)
   - `ForbiddenError` (403)
@@ -190,20 +190,14 @@
 
 ### Developer Experience
 
-- [ ] **Create Makefile**
+- [x] **Create Makefile** (partial — missing build, start, lint, format, test, fresh)
   - `make dev` — run with hot reload (air)
   - `make dev-worker` — run worker
-  - `make build` — build binary
-  - `make start` — run binary
-  - `make lint` — run golangci-lint
-  - `make format` — gofmt + goimports
-  - `make test` — run tests
-  - `make migrate` — run migrations
   - `make seed` — seed database
-  - `make fresh` — drop + migrate + seed
+  - `make migrate-*` — migration commands
   - `make docs` — generate swagger docs
 
-- [ ] **Hot reload with Air**
+- [x] **Hot reload with Air**
   - Install `cosmtrek/air`
   - Create `.air.toml` config
   - Separate configs for server and worker
@@ -259,13 +253,13 @@
 
 | Feature                    | clean-elysia | clean-hono | clean-go-fiber |
 | -------------------------- | :----------: | :--------: | :------------: |
-| JWT Authentication         |      ✅      |     ✅     |       ⬜       |
+| JWT Authentication         |      ✅      |     ✅     |       ✅       |
 | RBAC (Roles + Permissions) |      ✅      |     ✅     |       ⬜       |
-| OpenAPI / Swagger Docs     |      ✅      |     ✅     |       ⬜       |
-| Email Verification Flow    |      ✅      |     ✅     |       ⬜       |
-| Password Reset Flow        |      ✅      |     ✅     |       ⬜       |
+| OpenAPI / Swagger Docs     |      ✅      |     ✅     |       ✅       |
+| Email Verification Flow    |      ✅      |     ✅     |       ✅       |
+| Password Reset Flow        |      ✅      |     ✅     |       ✅       |
 | Background Jobs (Queue)    |      ✅      |     ✅     |       ⬜       |
-| PostgreSQL (GORM/Drizzle)  |      ✅      |     ✅     |       ⬜       |
+| PostgreSQL (GORM/Drizzle)  |      ✅      |     ✅     |       ✅       |
 | Redis Cache                |      ✅      |     ✅     |       ⬜       |
 | Rate Limiting              |      ✅      |     ✅     |       ⬜       |
 | Security Headers           |      ✅      |     ✅     |       ⬜       |
@@ -274,11 +268,11 @@
 | Request ID                 |      ✅      |     ✅     |       ⬜       |
 | Structured Logging         |      ✅      |     ✅     |       ⬜       |
 | Performance Monitoring     |      ✅      |     ✅     |       ⬜       |
-| DI Container               |      ✅      |     ✅     |       ⬜       |
+| DI Container               |      ✅      |     ✅     |       ✅       |
 | Docker + docker-compose    |      ✅      |     ✅     |       ⬜       |
-| Makefile                   |      ✅      |     ✅     |       ⬜       |
-| Hot Reload (dev)           |      ✅      |     ✅     |       ⬜       |
-| Env Validation             |      ✅      |     ✅     |       ⬜       |
+| Makefile                   |      ✅      |     ✅     |       🔶       |
+| Hot Reload (dev)           |      ✅      |     ✅     |       ✅       |
+| Env Validation             |      ✅      |     ✅     |       ✅       |
 | Unit Tests                 |      ❌      |     ❌     |       ⬜       |
 
 ---

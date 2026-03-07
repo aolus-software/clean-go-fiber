@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"time"
+
 	"github.com/aolus-software/clean-go-fiber/internal/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -10,24 +12,26 @@ import (
 var DB *gorm.DB
 
 func Connect() (*gorm.DB, error) {
-	databseUrl := config.C.Database.URL
 	logLevel := logger.Silent
 	if config.C.App.Env == "development" {
 		logLevel = logger.Info
 	}
 
-	db, err := gorm.Open(postgres.Open(databseUrl), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(config.C.Database.URL), &gorm.Config{
 		Logger: logger.Default.LogMode(logLevel),
 	})
-
 	if err != nil {
 		return nil, err
 	}
 
-	// sqlDB, err := db.DB()
-	// if err != nil {
-	// 	return nil, err
-	// }
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDB.SetMaxOpenConns(25)
+	sqlDB.SetMaxIdleConns(10)
+	sqlDB.SetConnMaxLifetime(5 * time.Minute)
 
 	DB = db
 

@@ -35,7 +35,7 @@ func (r *userRepository) FindAll(ctx context.Context, queryParams *pagination.Qu
 		return nil, err
 	}
 
-	query := r.db.WithContext(ctx).Model(&models.User{}).Preload("Roles")
+	query := r.db.WithContext(ctx).Model(&models.User{})
 
 	if queryParams.Search != "" {
 		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+queryParams.Search+"%", "%"+queryParams.Search+"%")
@@ -69,7 +69,7 @@ func (r *userRepository) FindAll(ctx context.Context, queryParams *pagination.Qu
 	}
 
 	var users []models.User
-	if err := query.Offset((queryParams.Page - 1) * queryParams.PerPage).Limit(queryParams.PerPage).Find(&users).Error; err != nil {
+	if err := query.Preload("Roles").Offset((queryParams.Page - 1) * queryParams.PerPage).Limit(queryParams.PerPage).Find(&users).Error; err != nil {
 		return nil, err
 	}
 
@@ -77,6 +77,7 @@ func (r *userRepository) FindAll(ctx context.Context, queryParams *pagination.Qu
 		Total:       total,
 		PerPage:     queryParams.PerPage,
 		CurrentPage: queryParams.Page,
+		LastPage:    pagination.CalcLastPage(total, queryParams.PerPage),
 		Data:        users,
 	}, nil
 }
