@@ -108,14 +108,28 @@
   - `PATCH /api/profile/me` — update profile
   - `PATCH /api/profile/me/password` — change password
 
-- [x] **Settings module**
-  - `GET /api/settings/roles` — list roles
-  - `POST /api/settings/roles` — create role
-  - `GET /api/settings/roles/:id` — get role
-  - `PATCH /api/settings/roles/:id` — update role
-  - `DELETE /api/settings/roles/:id` — delete role
-  - Same CRUD for permissions
-  - Assign role/permission endpoints
+- [x] **Permissions module** (`/permissions`)
+  - `GET /permissions` — list permissions
+  - `POST /permissions` — create permission
+  - `GET /permissions/:id` — get permission
+  - `PATCH /permissions/:id` — update permission
+  - `DELETE /permissions/:id` — delete permission
+
+- [x] **Roles module** (`/roles`)
+  - `GET /roles` — list roles
+  - `POST /roles` — create role
+  - `GET /roles/:id` — get role
+  - `PATCH /roles/:id` — update role
+  - `DELETE /roles/:id` — delete role
+  - `POST /roles/:id/permissions` — sync permissions to role
+
+- [x] **Users module** (`/users`)
+  - `GET /users` — list users
+  - `POST /users` — create user
+  - `GET /users/:id` — get user
+  - `PATCH /users/:id` — update user
+  - `DELETE /users/:id` — delete user
+  - `POST /users/:id/roles` — sync roles to user
 
 ### API Documentation
 
@@ -239,7 +253,7 @@
 
 ### Documentation
 
-- [ ] **Write README.md**
+- [x] **Write README.md**
   - Project overview and architecture
   - Quick start guide
   - Environment variables reference
@@ -254,7 +268,7 @@
 | Feature                    | clean-elysia | clean-hono | clean-go-fiber |
 | -------------------------- | :----------: | :--------: | :------------: |
 | JWT Authentication         |      ✅      |     ✅     |       ✅       |
-| RBAC (Roles + Permissions) |      ✅      |     ✅     |       ⬜       |
+| RBAC (Roles + Permissions) |      ✅      |     ✅     |       ✅       |
 | OpenAPI / Swagger Docs     |      ✅      |     ✅     |       ✅       |
 | Email Verification Flow    |      ✅      |     ✅     |       ✅       |
 | Password Reset Flow        |      ✅      |     ✅     |       ✅       |

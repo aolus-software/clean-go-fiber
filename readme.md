@@ -107,7 +107,7 @@ clean-go-fiber/
 │   │   └── validator/          # Validation wrapper
 │   ├── middleware/             # Fiber middleware (auth, logger, cors)
 │   ├── models/                 # GORM models — no business logic
-│   ├── modules/                # Feature modules (auth, profile, settings)
+│   ├── modules/                # Feature modules (auth, profile, users, roles, permissions)
 │   ├── queue/                  # Asynq client + task definitions
 │   ├── repositories/           # Interfaces + GORM implementations
 │   └── worker/                 # Asynq server + task handlers
@@ -124,6 +124,59 @@ All features follow a strict layering: **Handler → Service → Repository → 
 - **Services** — business logic only. Accept repository interfaces.
 - **Repositories** — all database access. Return domain models.
 - **Models** — GORM model structs. No methods or logic.
+
+---
+
+## API Endpoints
+
+All routes (except auth) require a `Bearer` token in the `Authorization` header.
+
+### Auth — `/auth`
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/auth/register` | Register a new account |
+| POST | `/auth/login` | Login and get tokens |
+| POST | `/auth/refresh-token` | Refresh access token |
+| POST | `/auth/verify-email` | Verify email address |
+| POST | `/auth/resend-verification` | Resend verification email |
+| POST | `/auth/forgot-password` | Request password reset |
+| POST | `/auth/reset-password` | Reset password with token |
+
+### Profile — `/profile`
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/profile/me` | Get current user profile |
+| PATCH | `/profile/me` | Update profile |
+| PATCH | `/profile/me/password` | Change password |
+
+### Users — `/users`
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/users` | List users |
+| POST | `/users` | Create user |
+| GET | `/users/:id` | Get user by ID |
+| PATCH | `/users/:id` | Update user |
+| DELETE | `/users/:id` | Delete user |
+| POST | `/users/:id/roles` | Sync roles to user |
+
+### Roles — `/roles`
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/roles` | List roles |
+| POST | `/roles` | Create role |
+| GET | `/roles/:id` | Get role by ID |
+| PATCH | `/roles/:id` | Update role |
+| DELETE | `/roles/:id` | Delete role |
+| POST | `/roles/:id/permissions` | Sync permissions to role |
+
+### Permissions — `/permissions`
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/permissions` | List permissions |
+| POST | `/permissions` | Create permission |
+| GET | `/permissions/:id` | Get permission by ID |
+| PATCH | `/permissions/:id` | Update permission |
+| DELETE | `/permissions/:id` | Delete permission |
 
 ---
 

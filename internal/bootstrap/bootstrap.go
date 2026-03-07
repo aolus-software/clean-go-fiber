@@ -5,8 +5,10 @@ import (
 	"github.com/aolus-software/clean-go-fiber/internal/modules/auth"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/docs"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/health"
+	"github.com/aolus-software/clean-go-fiber/internal/modules/permissions"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/profile"
-	"github.com/aolus-software/clean-go-fiber/internal/modules/settings"
+	"github.com/aolus-software/clean-go-fiber/internal/modules/roles"
+	"github.com/aolus-software/clean-go-fiber/internal/modules/users"
 	"github.com/aolus-software/clean-go-fiber/internal/repositories"
 	"github.com/gofiber/fiber/v2"
 	"gorm.io/gorm"
@@ -28,6 +30,12 @@ func RegisterRoutes(app *fiber.App, db *gorm.DB, cfg *config.Config) {
 	profileService := profile.NewService(userRepo)
 	profile.NewHandler(profileService).RegisterRoutes(app)
 
-	settingsService := settings.NewService(roleRepo, permissionRepo, userRepo)
-	settings.NewHandler(settingsService).RegisterRoutes(app, userRepo)
+	permissionsService := permissions.NewService(permissionRepo)
+	permissions.NewHandler(permissionsService).RegisterRoutes(app, userRepo)
+
+	rolesService := roles.NewService(roleRepo, permissionRepo)
+	roles.NewHandler(rolesService).RegisterRoutes(app, userRepo)
+
+	usersService := users.NewService(userRepo, roleRepo)
+	users.NewHandler(usersService).RegisterRoutes(app, userRepo)
 }

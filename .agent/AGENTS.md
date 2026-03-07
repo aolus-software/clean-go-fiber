@@ -70,7 +70,7 @@ clean-go-fiber/
 │   │   └── validator/          # Validation wrapper
 │   ├── middleware/             # Fiber middleware (auth, logger, cors, etc.)
 │   ├── models/                 # GORM models only — no business logic
-│   ├── modules/                # Feature modules (auth, profile, settings)
+│   ├── modules/                # Feature modules (auth, profile, users, roles, permissions)
 │   │   └── <module>/
 │   │       ├── handler.go      # HTTP handlers (parse → call service → respond)
 │   │       ├── routes.go       # Route registration
