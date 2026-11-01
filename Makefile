@@ -1,55 +1,89 @@
-docs:
-	swag init -g cmd/server/main.go -o docs
+MIGRATE_DIR := internal/database/postgres/migrations
+COMPOSE     := docker compose
 
-dev:
-	$(MAKE) dev-server & $(MAKE) dev-worker
+.PHONY: help dev dev-server dev-worker build start lint format test docs \
+	db-migrate db-migrate-down db-migrate-create db-seed fresh reset \
+	docker-build docker-up docker-down docker-restart docker-logs docker-ps docker-migrate docker-seed
 
-dev-server:
+help: ## List every target
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
+
+dev: ## Run the server (air hot reload) and the worker
+	$(MAKE) -j2 dev-server dev-worker
+
+dev-server: ## Run the server with air hot reload
 	air
 
-dev-worker:
-	go run ./cmd/worker/main.go
+dev-worker: ## Run the asynq worker
+	go run ./cmd/worker
 
-# ---------------------------------------------------------------------------
-# Database migrations (requires `migrate` CLI: go install github.com/golang-migrate/migrate/v4/cmd/migrate@latest)
-# ---------------------------------------------------------------------------
-DB_USER     := $(shell grep '^DB_USER='     .env 2>/dev/null | cut -d= -f2)
-DB_PASSWORD := $(shell grep '^DB_PASSWORD=' .env 2>/dev/null | cut -d= -f2)
-DB_HOST     := $(shell grep '^DB_HOST='     .env 2>/dev/null | cut -d= -f2)
-DB_PORT     := $(shell grep '^DB_PORT='     .env 2>/dev/null | cut -d= -f2)
-DB_NAME     := $(shell grep '^DB_NAME='     .env 2>/dev/null | cut -d= -f2)
-DB_SSLMODE  := $(shell grep '^DB_SSLMODE='  .env 2>/dev/null | cut -d= -f2)
+build: ## Build the server, worker, migrate and seed binaries into bin/
+	go build -o bin/server ./cmd/server
+	go build -o bin/worker ./cmd/worker
+	go build -o bin/migrate ./cmd/migrate
+	go build -o bin/seed ./cmd/seed
 
-MIGRATE_URL := postgres://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/$(DB_NAME)?sslmode=$(DB_SSLMODE)
-MIGRATE_DIR := internal/database/postgres/migrations
+start: ## Run the built server
+	./bin/server
 
-# Create a new migration file pair.
-# Usage: make migrate-create NAME=add_users_table
-migrate-create:
-	@test -n "$(NAME)" || (echo "Error: NAME is required. Usage: make migrate-create NAME=<migration_name>" && exit 1)
-	migrate create -ext sql -dir $(MIGRATE_DIR) -seq $(NAME)
+lint: ## gofmt check (must print nothing) and go vet
+	@test -z "$$(gofmt -l .)" || (echo "gofmt needed on:"; gofmt -l .; exit 1)
+	go vet ./...
 
-# Apply all pending migrations.
-migrate-up:
-	migrate -path $(MIGRATE_DIR) -database "$(MIGRATE_URL)" up
+format: ## Format every Go file with gofmt
+	gofmt -w .
 
-# Roll back the last N migrations (default: 1).
-# Usage: make migrate-down        (rolls back 1)
-#        make migrate-down N=3    (rolls back 3)
-migrate-down:
-	migrate -path $(MIGRATE_DIR) -database "$(MIGRATE_URL)" down $(if $(N),$(N),1)
+test: ## Run go test (no _test.go files exist yet)
+	go test ./...
 
-# Show the current migration version.
-migrate-status:
-	migrate -path $(MIGRATE_DIR) -database "$(MIGRATE_URL)" version
+docs: ## Regenerate docs/swagger.* (needs the swag CLI)
+	swag init -d "$$(go list -f '{{.Dir}}' ./cmd/server ./internal/... | paste -sd, -)" -g main.go -o docs
 
-# Force-set the migration version (use after manually fixing a dirty state).
-# Usage: make migrate-force VERSION=1
-migrate-force:
-	@test -n "$(VERSION)" || (echo "Error: VERSION is required. Usage: make migrate-force VERSION=<n>" && exit 1)
-	migrate -path $(MIGRATE_DIR) -database "$(MIGRATE_URL)" force $(VERSION)
+db-migrate: ## Apply pending migrations
+	go run ./cmd/migrate up
 
-seed:
-	go run ./cmd/seed/main.go
+db-migrate-down: ## Roll back every migration (destructive)
+	go run ./cmd/migrate down
 
-.PHONY: docs dev dev-server dev-worker migrate-create migrate-up migrate-down migrate-status migrate-force seed
+db-migrate-create: ## Create a migration pair: make db-migrate-create NAME=<name>
+	@test -n "$(NAME)" || (echo "Usage: make db-migrate-create NAME=<name>" && exit 1)
+	@last=$$(ls $(MIGRATE_DIR)/*.up.sql 2>/dev/null | sed 's#.*/##' | cut -d_ -f1 | sort -n | tail -1); \
+	next=$$(printf "%06d" $$((10#$${last:-0} + 1))); \
+	touch $(MIGRATE_DIR)/$${next}_$(NAME).up.sql $(MIGRATE_DIR)/$${next}_$(NAME).down.sql; \
+	echo "Created $(MIGRATE_DIR)/$${next}_$(NAME).{up,down}.sql"
+
+db-seed: ## Seed permissions, roles and users (idempotent)
+	go run ./cmd/seed
+
+fresh: ## DESTRUCTIVE: roll back everything, migrate, seed
+	go run ./cmd/migrate down
+	go run ./cmd/migrate up
+	go run ./cmd/seed
+
+reset: ## Migrate and seed
+	go run ./cmd/migrate up
+	go run ./cmd/seed
+
+docker-build: ## Build the compose images
+	$(COMPOSE) build
+
+docker-up: ## Start every compose service
+	$(COMPOSE) up -d
+
+docker-down: ## Stop every compose service
+	$(COMPOSE) down
+
+docker-restart: ## Restart every compose service
+	$(COMPOSE) restart
+
+docker-logs: ## Follow compose logs
+	$(COMPOSE) logs -f
+
+docker-ps: ## List compose services
+	$(COMPOSE) ps
+
+docker-migrate: ## Run migrations from the migrator stage
+	$(COMPOSE) run --rm migrator ./migrate up
+
+docker-seed: ## Seed from the migrator stage
+	$(COMPOSE) run --rm migrator ./seed

@@ -3,7 +3,6 @@ package roles
 import (
 	"github.com/aolus-software/clean-go-fiber/internal/libs/pagination"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
-	"github.com/aolus-software/clean-go-fiber/internal/libs/validator"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -16,143 +15,130 @@ func NewHandler(service Service) *Handler {
 }
 
 // @Summary     List roles
-// @Tags        roles
+// @Description Requires 'role list' permission. Filters: filter[name], filter[createdAt], filter[updatedAt] (YYYY-MM-DD or start,end).
+// @Tags        Settings/Roles
 // @Produce     json
 // @Security    BearerAuth
-// @Param       page            query  int     false  "Page"
-// @Param       per_page        query  int     false  "Per page"
-// @Param       search          query  string  false  "Search"
-// @Param       order_by        query  string  false  "Order by"
-// @Param       sort_direction  query  string  false  "Sort direction"
-// @Success     200  {object}  utils.Response
+// @Param       page           query  int     false  "Page (>= 1)"
+// @Param       perPage        query  int     false  "Page size (1-100)"
+// @Param       search         query  string  false  "Search name"
+// @Param       sort           query  string  false  "id, name, createdAt, updatedAt"
+// @Param       sortDirection  query  string  false  "asc or desc"
+// @Success     200  {object}  utils.Response{data=utils.PaginatedData[roles.RoleList]}
+// @Failure     400  {object}  utils.ErrorResponse
 // @Failure     401  {object}  utils.Response
-// @Router      /roles [get]
+// @Failure     403  {object}  utils.Response
+// @Failure     422  {object}  utils.ErrorResponse
+// @Router      /settings/roles [get]
 func (h *Handler) List(c *fiber.Ctx) error {
-	q := pagination.ParseFromFiber(c)
+	q, err := pagination.Parse(c)
+	if err != nil {
+		return err
+	}
 	result, err := h.service.List(c.Context(), q)
 	if err != nil {
 		return err
 	}
-	return utils.OK(c, result)
-}
-
-// @Summary     Get role by ID
-// @Tags        roles
-// @Produce     json
-// @Security    BearerAuth
-// @Param       id   path      string  true  "Role ID"
-// @Success     200  {object}  utils.Response{data=roles.RoleResponse}
-// @Failure     401  {object}  utils.Response
-// @Failure     404  {object}  utils.Response
-// @Router      /roles/{id} [get]
-func (h *Handler) Get(c *fiber.Ctx) error {
-	result, err := h.service.GetByID(c.Context(), c.Params("id"))
-	if err != nil {
-		return err
-	}
-	return utils.OK(c, result)
+	return utils.OK(c, "Roles retrieved", result)
 }
 
 // @Summary     Create role
-// @Tags        roles
+// @Description Requires 'role create' permission.
+// @Tags        Settings/Roles
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       body  body      roles.RoleRequest  true  "Role data"
-// @Success     201   {object}  utils.Response{data=roles.RoleResponse}
+// @Param       body  body      roles.RoleRequest  true  "Role"
+// @Success     201   {object}  utils.Response
+// @Failure     400   {object}  utils.ErrorResponse
 // @Failure     401   {object}  utils.Response
-// @Failure     422   {object}  utils.Response
-// @Router      /roles [post]
+// @Failure     403   {object}  utils.Response
+// @Failure     422   {object}  utils.ErrorResponse
+// @Router      /settings/roles [post]
 func (h *Handler) Create(c *fiber.Ctx) error {
 	var req RoleRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.ErrBadRequest
+	if err := utils.ParseBody(c, &req); err != nil {
+		return err
 	}
-	if err := validator.Validate(&req); err != nil {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"errors":  err,
-		})
+	if err := h.service.Create(c.Context(), &req); err != nil {
+		return err
 	}
-	result, err := h.service.Create(c.Context(), &req)
+	return utils.Created(c, "Role created", nil)
+}
+
+// @Summary     Role detail
+// @Description Every permission, grouped, with isAssigned for this role. Requires 'role detail' permission.
+// @Tags        Settings/Roles
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path      string  true  "Role ID (uuid)"
+// @Success     200  {object}  utils.Response{data=roles.RoleDetail}
+// @Failure     401  {object}  utils.Response
+// @Failure     403  {object}  utils.Response
+// @Failure     404  {object}  utils.Response
+// @Failure     422  {object}  utils.ErrorResponse
+// @Router      /settings/roles/{id} [get]
+func (h *Handler) Detail(c *fiber.Ctx) error {
+	id, err := utils.ParamUUID(c, "id")
 	if err != nil {
 		return err
 	}
-	return utils.Created(c, result)
+	result, err := h.service.Detail(c.Context(), id)
+	if err != nil {
+		return err
+	}
+	return utils.OK(c, "Role retrieved", result)
 }
 
 // @Summary     Update role
-// @Tags        roles
+// @Description Replace a role's name and permissions. Requires 'role edit' permission. The superuser role cannot be renamed.
+// @Tags        Settings/Roles
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       id    path      string             true  "Role ID"
-// @Param       body  body      roles.RoleRequest  true  "Role data"
-// @Success     200   {object}  utils.Response{data=roles.RoleResponse}
+// @Param       id    path      string             true  "Role ID (uuid)"
+// @Param       body  body      roles.RoleRequest  true  "Role"
+// @Success     200   {object}  utils.Response
+// @Failure     400   {object}  utils.ErrorResponse
 // @Failure     401   {object}  utils.Response
+// @Failure     403   {object}  utils.Response
 // @Failure     404   {object}  utils.Response
-// @Failure     422   {object}  utils.Response
-// @Router      /roles/{id} [patch]
+// @Failure     422   {object}  utils.ErrorResponse
+// @Router      /settings/roles/{id} [patch]
 func (h *Handler) Update(c *fiber.Ctx) error {
-	var req RoleRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.ErrBadRequest
-	}
-	if err := validator.Validate(&req); err != nil {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"errors":  err,
-		})
-	}
-	result, err := h.service.Update(c.Context(), c.Params("id"), &req)
+	id, err := utils.ParamUUID(c, "id")
 	if err != nil {
 		return err
 	}
-	return utils.OK(c, result)
+	var req RoleRequest
+	if err := utils.ParseBody(c, &req); err != nil {
+		return err
+	}
+	if err := h.service.Update(c.Context(), id, &req); err != nil {
+		return err
+	}
+	return utils.OK(c, "Role updated", nil)
 }
 
 // @Summary     Delete role
-// @Tags        roles
+// @Description Hard delete; assignments cascade. Requires 'role delete' permission. The superuser role cannot be deleted.
+// @Tags        Settings/Roles
 // @Produce     json
 // @Security    BearerAuth
-// @Param       id   path  string  true  "Role ID"
-// @Success     204
+// @Param       id   path      string  true  "Role ID (uuid)"
+// @Success     200  {object}  utils.Response
 // @Failure     401  {object}  utils.Response
+// @Failure     403  {object}  utils.Response
 // @Failure     404  {object}  utils.Response
-// @Router      /roles/{id} [delete]
+// @Failure     422  {object}  utils.ErrorResponse
+// @Router      /settings/roles/{id} [delete]
 func (h *Handler) Delete(c *fiber.Ctx) error {
-	if err := h.service.Delete(c.Context(), c.Params("id")); err != nil {
-		return err
-	}
-	return utils.NoContent(c)
-}
-
-// @Summary     Sync role permissions
-// @Tags        roles
-// @Accept      json
-// @Produce     json
-// @Security    BearerAuth
-// @Param       id    path      string                        true  "Role ID"
-// @Param       body  body      roles.SyncPermissionsRequest  true  "Permission IDs"
-// @Success     200   {object}  utils.Response{data=roles.RoleResponse}
-// @Failure     401   {object}  utils.Response
-// @Failure     404   {object}  utils.Response
-// @Failure     422   {object}  utils.Response
-// @Router      /roles/{id}/permissions [post]
-func (h *Handler) SyncPermissions(c *fiber.Ctx) error {
-	var req SyncPermissionsRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.ErrBadRequest
-	}
-	if err := validator.Validate(&req); err != nil {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"errors":  err,
-		})
-	}
-	result, err := h.service.SyncPermissions(c.Context(), c.Params("id"), &req)
+	id, err := utils.ParamUUID(c, "id")
 	if err != nil {
 		return err
 	}
-	return utils.OK(c, result)
+	if err := h.service.Delete(c.Context(), id); err != nil {
+		return err
+	}
+	return utils.OK(c, "Role deleted", nil)
 }

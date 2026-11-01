@@ -1,17 +1,25 @@
 package config
 
+import (
+	"log"
+	"time"
+)
+
+const (
+	AccessTokenLifetime  = 24 * time.Hour
+	RefreshTokenLifetime = 7 * 24 * time.Hour
+)
+
 type JWTConfig struct {
-	SecretKey string
-	RefreshSecretKey string
-	ExpiresIn int
-	RefreshExpiresIn int
+	Secret        string
+	RefreshSecret string
 }
 
 func loadJWT() JWTConfig {
-	return JWTConfig{
-		SecretKey: requireEnv("JWT_SECRET_KEY"),
-		RefreshSecretKey: requireEnv("JWT_REFRESH_SECRET_KEY"),
-		ExpiresIn: getEnvInt("JWT_EXPIRES_IN", 7200),
-		RefreshExpiresIn: getEnvInt("JWT_REFRESH_EXPIRES_IN", 604800),
+	secret := requireEnv("JWT_SECRET")
+	refresh := requireEnv("JWT_REFRESH_SECRET")
+	if secret == refresh {
+		log.Fatal("JWT_REFRESH_SECRET must differ from JWT_SECRET")
 	}
+	return JWTConfig{Secret: secret, RefreshSecret: refresh}
 }

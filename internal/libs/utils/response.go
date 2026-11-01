@@ -1,104 +1,52 @@
 package utils
 
-import "github.com/gofiber/fiber/v2"
+import (
+	apperrors "github.com/aolus-software/clean-go-fiber/internal/errors"
+	"github.com/gofiber/fiber/v2"
+)
 
 type Response struct {
+	Status  int    `json:"status"`
 	Success bool   `json:"success"`
-	Status  string `json:"status"`
-	Message string `json:"message,omitempty"`
-	Data    any    `json:"data,omitempty"`
+	Message string `json:"message"`
+	Data    any    `json:"data"`
 }
 
-func OK(c *fiber.Ctx, data any) error {
-	return c.Status(fiber.StatusOK).JSON(Response{
-		Success: true,
-		Status:  "success",
-		Data:    data,
-	})
+type ErrorResponse struct {
+	Status  int                    `json:"status"`
+	Success bool                   `json:"success"`
+	Message string                 `json:"message"`
+	Errors  []apperrors.FieldError `json:"errors"`
 }
 
-func Created(c *fiber.Ctx, data any) error {
-	return c.Status(fiber.StatusCreated).JSON(Response{
-		Success: true,
-		Status:  "success",
-		Data:    data,
-	})
+type PaginationMeta struct {
+	Page       int   `json:"page"`
+	Limit      int   `json:"limit"`
+	TotalCount int64 `json:"totalCount"`
 }
 
-func NoContent(c *fiber.Ctx) error {
-	return c.SendStatus(fiber.StatusNoContent)
+type PaginatedData[T any] struct {
+	Data []T            `json:"data"`
+	Meta PaginationMeta `json:"meta"`
 }
 
-func BadRequest(c *fiber.Ctx, message string) error {
-	return c.Status(fiber.StatusBadRequest).JSON(Response{
-		Success: false,
-		Status:  "error",
-		Message: message,
-	})
+func OK(c *fiber.Ctx, message string, data any) error {
+	return c.Status(fiber.StatusOK).JSON(Response{Status: fiber.StatusOK, Success: true, Message: message, Data: data})
 }
 
-func Unauthorized(c *fiber.Ctx, message string) error {
-	return c.Status(fiber.StatusUnauthorized).JSON(Response{
-		Success: false,
-		Status:  "error",
-		Message: message,
-	})
+func Created(c *fiber.Ctx, message string, data any) error {
+	return c.Status(fiber.StatusCreated).JSON(Response{Status: fiber.StatusCreated, Success: true, Message: message, Data: data})
 }
 
-func Forbidden(c *fiber.Ctx, message string) error {
-	return c.Status(fiber.StatusForbidden).JSON(Response{
-		Success: false,
-		Status:  "error",
-		Message: message,
-	})
-}
-
-func NotFound(c *fiber.Ctx, message string) error {
-	return c.Status(fiber.StatusNotFound).JSON(Response{
-		Success: false,
-		Status:  "error",
-		Message: message,
-	})
-}
-
-func TooManyRequests(c *fiber.Ctx, message string) error {
-	return c.Status(fiber.StatusTooManyRequests).JSON(Response{
-		Success: false,
-		Status:  "error",
-		Message: message,
-	})
-}
-
-func InternalServerError(c *fiber.Ctx, message string) error {
-	return c.Status(fiber.StatusInternalServerError).JSON(Response{
-		Success: false,
-		Status:  "error",
-		Message: message,
-	})
-}
-
-func ErrorResponse(c *fiber.Ctx, code int, message string) error {
-	return c.Status(code).JSON(Response{
-		Success: false,
-		Status:  "error",
-		Message: message,
-	})
-}
-
-func PaginatedOK(c *fiber.Ctx, data any, total int64, perPage, currentPage int) error {
-	lastPage := 0
-	if perPage > 0 {
-		lastPage = int((total + int64(perPage) - 1) / int64(perPage))
+func Error(c *fiber.Ctx, code int, message string, fields []apperrors.FieldError) error {
+	if code == fiber.StatusBadRequest || code == fiber.StatusUnprocessableEntity {
+		if fields == nil {
+			fields = []apperrors.FieldError{}
+		}
+		return c.Status(code).JSON(ErrorResponse{Status: code, Success: false, Message: message, Errors: fields})
 	}
-	return c.Status(fiber.StatusOK).JSON(fiber.Map{
-		"success": true,
-		"status":  "success",
-		"data":    data,
-		"meta": fiber.Map{
-			"total":        total,
-			"per_page":     perPage,
-			"current_page": currentPage,
-			"last_page":    lastPage,
-		},
-	})
+	if code == fiber.StatusTooManyRequests {
+		return c.Status(code).JSON(fiber.Map{"status": code, "success": false, "message": message})
+	}
+	return c.Status(code).JSON(Response{Status: code, Success: false, Message: message, Data: nil})
 }

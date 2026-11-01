@@ -1,6 +1,4 @@
-FROM golang:1.25-alpine AS builder
-
-RUN apk add --no-cache git
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
@@ -8,24 +6,32 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
-RUN go build -o server ./cmd/server/main.go
-RUN go build -o worker ./cmd/worker/main.go
+RUN CGO_ENABLED=0 go build -o /out/server ./cmd/server \
+	&& CGO_ENABLED=0 go build -o /out/worker ./cmd/worker \
+	&& CGO_ENABLED=0 go build -o /out/migrate ./cmd/migrate \
+	&& CGO_ENABLED=0 go build -o /out/seed ./cmd/seed
 
-FROM alpine:3.20
+FROM alpine:3.20 AS migrator
 
-RUN apk add --no-cache ca-certificates tzdata
-
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN apk add --no-cache ca-certificates tzdata \
+	&& addgroup -S appgroup && adduser -S appuser -G appgroup
 
 WORKDIR /app
-
-COPY --from=builder /app/server .
-COPY --from=builder /app/worker .
-
-RUN chown -R appuser:appgroup /app
-
+COPY --from=builder /out/migrate /out/seed ./
 USER appuser
 
-EXPOSE 8080
+CMD ["./migrate", "up"]
+
+FROM alpine:3.20 AS release
+
+RUN apk add --no-cache ca-certificates tzdata \
+	&& addgroup -S appgroup && adduser -S appuser -G appgroup
+
+WORKDIR /app
+COPY --from=builder /out/server /out/worker ./
+COPY docs/swagger.json ./docs/swagger.json
+USER appuser
+
+EXPOSE 3000
 
 CMD ["./server"]

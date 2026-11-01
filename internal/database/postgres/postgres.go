@@ -13,12 +13,14 @@ var DB *gorm.DB
 
 func Connect() (*gorm.DB, error) {
 	logLevel := logger.Silent
-	if config.C.App.Env == "development" {
+	if config.C.App.Env == "development" && config.C.App.LogLevel == "debug" {
 		logLevel = logger.Info
 	}
 
 	db, err := gorm.Open(postgres.Open(config.C.Database.URL), &gorm.Config{
-		Logger: logger.Default.LogMode(logLevel),
+		Logger:         logger.Default.LogMode(logLevel),
+		TranslateError: true,
+		NowFunc:        func() time.Time { return time.Now().UTC() },
 	})
 	if err != nil {
 		return nil, err

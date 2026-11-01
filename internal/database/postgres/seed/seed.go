@@ -2,72 +2,110 @@ package seed
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
 	"github.com/aolus-software/clean-go-fiber/internal/models"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+const DefaultPassword = "S3crEtP4ssw0rd!"
+
+var (
+	permissionGroups  = []string{"user", "role", "permission"}
+	permissionActions = []string{"list", "create", "detail", "edit", "delete"}
+	seededRoles       = []string{models.SuperuserRole, "admin"}
 )
 
 func Run(db *gorm.DB) error {
-	permissions := []models.Permission{
-		{Name: "read", Modules: "users"},
-		{Name: "create", Modules: "users"},
-		{Name: "update", Modules: "users"},
-		{Name: "delete", Modules: "users"},
-		{Name: "read", Modules: "roles"},
-		{Name: "create", Modules: "roles"},
-		{Name: "update", Modules: "roles"},
-		{Name: "delete", Modules: "roles"},
-		{Name: "read", Modules: "permissions"},
-		{Name: "create", Modules: "permissions"},
-		{Name: "update", Modules: "permissions"},
-		{Name: "delete", Modules: "permissions"},
-	}
+	return db.Transaction(func(tx *gorm.DB) error {
+		names, err := seedPermissions(tx)
+		if err != nil {
+			return err
+		}
+		roles, err := seedRoles(tx, names)
+		if err != nil {
+			return err
+		}
+		return seedUsers(tx, roles)
+	})
+}
 
-	for i := range permissions {
-		result := db.Where(models.Permission{Name: permissions[i].Name, Modules: permissions[i].Modules}).
-			FirstOrCreate(&permissions[i])
-		if result.Error != nil {
-			return fmt.Errorf("seed permission %s.%s: %w", permissions[i].Modules, permissions[i].Name, result.Error)
+func seedPermissions(tx *gorm.DB) ([]string, error) {
+	names := make([]string, 0, len(permissionGroups)*len(permissionActions))
+	rows := make([]models.Permission, 0, cap(names))
+	for _, group := range permissionGroups {
+		for _, action := range permissionActions {
+			name := group + " " + action
+			names = append(names, name)
+			rows = append(rows, models.Permission{Name: name, Group: group})
 		}
 	}
+	if err := tx.Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "name"}}, DoNothing: true}).Create(&rows).Error; err != nil {
+		return nil, fmt.Errorf("seed permissions: %w", err)
+	}
+	return names, nil
+}
 
-	superuserRole := models.Role{Name: "superuser"}
-	if result := db.Where(models.Role{Name: "superuser"}).FirstOrCreate(&superuserRole); result.Error != nil {
-		return fmt.Errorf("seed superuser role: %w", result.Error)
+func seedRoles(tx *gorm.DB, permissionNames []string) (map[string]models.Role, error) {
+	var permissions []models.Permission
+	if err := tx.Where("name IN ?", permissionNames).Find(&permissions).Error; err != nil {
+		return nil, fmt.Errorf("seed roles: load permissions: %w", err)
 	}
 
-	superadminRole := models.Role{Name: "superadmin"}
-	if result := db.Where(models.Role{Name: "superadmin"}).FirstOrCreate(&superadminRole); result.Error != nil {
-		return fmt.Errorf("seed superadmin role: %w", result.Error)
+	roles := make(map[string]models.Role, len(seededRoles))
+	for _, name := range seededRoles {
+		role := models.Role{Name: name}
+		if err := tx.Where(models.Role{Name: name}).FirstOrCreate(&role).Error; err != nil {
+			return nil, fmt.Errorf("seed role %s: %w", name, err)
+		}
+		grants := make([]map[string]any, 0, len(permissions))
+		for _, p := range permissions {
+			grants = append(grants, map[string]any{"role_id": role.ID, "permission_id": p.ID})
+		}
+		if len(grants) > 0 {
+			if err := tx.Table("role_permissions").Clauses(clause.OnConflict{DoNothing: true}).Create(grants).Error; err != nil {
+				return nil, fmt.Errorf("seed role %s grants: %w", name, err)
+			}
+		}
+		roles[name] = role
 	}
+	return roles, nil
+}
 
-	if err := db.Model(&superuserRole).Association("Permissions").Replace(permissions); err != nil {
-		return fmt.Errorf("seed superuser role permissions: %w", err)
-	}
-
-	if err := db.Model(&superadminRole).Association("Permissions").Replace(permissions); err != nil {
-		return fmt.Errorf("seed superadmin role permissions: %w", err)
-	}
-
-	hashedPw, err := bcrypt.GenerateFromPassword([]byte("Password123!"), bcrypt.DefaultCost)
+func seedUsers(tx *gorm.DB, roles map[string]models.Role) error {
+	hashed, err := utils.HashPassword(DefaultPassword)
 	if err != nil {
-		return fmt.Errorf("seed hash password: %w", err)
+		return fmt.Errorf("seed users: hash password: %w", err)
 	}
+	now := time.Now().UTC()
 
-	superuser := models.User{
-		Name:     "Superuser",
-		Email:    "superuser@example.com",
-		Password: string(hashedPw),
-		Status:   "active",
-	}
-	if result := db.Where(models.User{Email: "superuser@example.com"}).FirstOrCreate(&superuser); result.Error != nil {
-		return fmt.Errorf("seed superuser user: %w", result.Error)
-	}
+	for _, roleName := range seededRoles {
+		email := roleName + "@example.com"
+		var user models.User
+		err := tx.Where("email = ?", email).First(&user).Error
+		if err == nil {
+			continue
+		}
+		if err != gorm.ErrRecordNotFound {
+			return fmt.Errorf("seed user %s: %w", email, err)
+		}
 
-	if err := db.Model(&superuser).Association("Roles").Replace([]models.Role{superuserRole}); err != nil {
-		return fmt.Errorf("seed superuser user roles: %w", err)
+		user = models.User{
+			Name:            roleName,
+			Email:           email,
+			Password:        hashed,
+			Status:          models.UserStatusActive,
+			EmailVerifiedAt: &now,
+		}
+		if err := tx.Omit(clause.Associations).Create(&user).Error; err != nil {
+			return fmt.Errorf("seed user %s: %w", email, err)
+		}
+		assignment := map[string]any{"user_id": user.ID, "role_id": roles[roleName].ID}
+		if err := tx.Table("user_roles").Clauses(clause.OnConflict{DoNothing: true}).Create(assignment).Error; err != nil {
+			return fmt.Errorf("seed user %s role: %w", email, err)
+		}
 	}
-
 	return nil
 }

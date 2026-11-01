@@ -2,95 +2,94 @@ package profile
 
 import (
 	"context"
+	"errors"
+	"strings"
 
-	"github.com/aolus-software/clean-go-fiber/internal/errors"
+	apperrors "github.com/aolus-software/clean-go-fiber/internal/errors"
+	"github.com/aolus-software/clean-go-fiber/internal/libs/cache"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
 	"github.com/aolus-software/clean-go-fiber/internal/repositories"
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type Service interface {
-	GetProfile(ctx context.Context, userID string) (*ProfileResponse, error)
-	UpdateProfile(ctx context.Context, userID string, req *UpdateProfileRequest) (*ProfileResponse, error)
-	ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest) error
+	Update(ctx context.Context, userID uuid.UUID, req *UpdateProfileRequest) (*repositories.UserInformation, error)
+	UpdatePassword(ctx context.Context, userID uuid.UUID, req *UpdatePasswordRequest) error
 }
 
 type service struct {
 	userRepo repositories.UserRepository
+	cache    *cache.Cache
 }
 
-func NewService(userRepo repositories.UserRepository) Service {
-	return &service{userRepo: userRepo}
+func NewService(userRepo repositories.UserRepository, c *cache.Cache) Service {
+	return &service{userRepo: userRepo, cache: c}
 }
 
-func (s *service) GetProfile(ctx context.Context, userID string) (*ProfileResponse, error) {
-	id, err := uuid.Parse(userID)
-	if err != nil {
-		return nil, errors.NewBadRequestError("invalid user id")
-	}
-	user, err := s.userRepo.FindById(ctx, id)
-	if err != nil {
-		return nil, errors.NewNotFoundError("user not found")
-	}
-	resp := &ProfileResponse{
-		ID:              user.ID.String(),
-		Name:            user.Name,
-		Email:           user.Email,
-		Status:          user.Status,
-		EmailVerifiedAt: user.EmailVerifiedAt,
-	}
-	for _, r := range user.Roles {
-		resp.Roles = append(resp.Roles, RoleItem{ID: r.ID.String(), Name: r.Name})
-	}
-	return resp, nil
+func emailTaken() error {
+	return apperrors.NewUnprocessableEntityError("Validation error", apperrors.Field("email", "Email is already registered"))
 }
 
-func (s *service) UpdateProfile(ctx context.Context, userID string, req *UpdateProfileRequest) (*ProfileResponse, error) {
-	id, err := uuid.Parse(userID)
+func (s *service) Update(ctx context.Context, userID uuid.UUID, req *UpdateProfileRequest) (*repositories.UserInformation, error) {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return nil, errors.NewBadRequestError("invalid user id")
+		return nil, err
 	}
-	user, err := s.userRepo.FindById(ctx, id)
+	if user == nil {
+		return nil, apperrors.NewNotFoundError("User not found")
+	}
+
+	email := strings.TrimSpace(req.Email)
+	existing, err := s.userRepo.FindLiveByEmail(ctx, email, &user.ID)
 	if err != nil {
-		return nil, errors.NewNotFoundError("user not found")
+		return nil, err
 	}
+	if existing != nil {
+		return nil, emailTaken()
+	}
+
 	user.Name = req.Name
-	updated, err := s.userRepo.Update(ctx, user)
+	user.Email = email
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, emailTaken()
+		}
+		return nil, err
+	}
+
+	info, err := s.userRepo.FindUserInformation(ctx, user.ID)
 	if err != nil {
-		return nil, errors.NewInternalServerError("failed to update profile")
+		return nil, err
 	}
-	resp := &ProfileResponse{
-		ID:              updated.ID.String(),
-		Name:            updated.Name,
-		Email:           updated.Email,
-		Status:          updated.Status,
-		EmailVerifiedAt: updated.EmailVerifiedAt,
+	if info == nil {
+		return nil, apperrors.NewUnauthorizedError("Unauthorized")
 	}
-	for _, r := range updated.Roles {
-		resp.Roles = append(resp.Roles, RoleItem{ID: r.ID.String(), Name: r.Name})
+	if err := s.cache.Set(ctx, cache.Key(cache.UserInformationKey, user.ID.String()), info, cache.UserInformationTTL); err != nil {
+		return nil, err
 	}
-	return resp, nil
+	return info, nil
 }
 
-func (s *service) ChangePassword(ctx context.Context, userID string, req *ChangePasswordRequest) error {
-	id, err := uuid.Parse(userID)
+func (s *service) UpdatePassword(ctx context.Context, userID uuid.UUID, req *UpdatePasswordRequest) error {
+	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		return errors.NewBadRequestError("invalid user id")
+		return err
 	}
-	user, err := s.userRepo.FindById(ctx, id)
-	if err != nil {
-		return errors.NewNotFoundError("user not found")
+	if user == nil {
+		return apperrors.NewUnauthorizedError("Unauthorized")
 	}
 	if !utils.CheckPasswordHash(req.CurrentPassword, user.Password) {
-		return errors.NewBadRequestError("current password is incorrect")
+		return apperrors.NewUnprocessableEntityError("Validation error", apperrors.Field("currentPassword", "Current password is incorrect"))
 	}
-	hashed, err := utils.HashPassword(req.Password)
+
+	hashed, err := utils.HashPassword(req.NewPassword)
 	if err != nil {
-		return errors.NewInternalServerError("failed to process password")
+		return err
 	}
 	user.Password = hashed
-	if _, err := s.userRepo.Update(ctx, user); err != nil {
-		return errors.NewInternalServerError("failed to update password")
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		return err
 	}
-	return nil
+	return s.cache.RevokeSessions(ctx, user.ID)
 }

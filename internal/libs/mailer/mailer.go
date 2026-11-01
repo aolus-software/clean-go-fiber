@@ -1,8 +1,6 @@
 package mailer
 
 import (
-	"strconv"
-
 	"github.com/aolus-software/clean-go-fiber/internal/config"
 	"gopkg.in/gomail.v2"
 )
@@ -22,17 +20,13 @@ type Message struct {
 }
 
 func (m *Mailer) Send(msg Message) error {
-	port, err := strconv.Atoi(m.cfg.Port)
-	if err != nil {
-		return err
-	}
-
 	mail := gomail.NewMessage()
-	mail.SetHeader("From", m.cfg.MailFrom)
+	mail.SetHeader("From", m.cfg.From)
 	mail.SetHeader("To", msg.To)
 	mail.SetHeader("Subject", msg.Subject)
 	mail.SetBody("text/html", msg.Body)
 
-	dialer := gomail.NewDialer(m.cfg.Host, port, m.cfg.User, m.cfg.Password)
+	dialer := gomail.NewDialer(m.cfg.Host, m.cfg.Port, m.cfg.User, m.cfg.Pass)
+	dialer.SSL = m.cfg.Secure
 	return dialer.DialAndSend(mail)
 }

@@ -1,20 +1,14 @@
 package auth
 
-import (
-	"github.com/aolus-software/clean-go-fiber/internal/middleware"
-	"github.com/gofiber/fiber/v2"
-)
+import "github.com/gofiber/fiber/v2"
 
 func (h *Handler) RegisterRoutes(router fiber.Router) {
-	auth := router.Group("/auth")
-
-	auth.Post("/register", h.Register)
-	auth.Post("/login", h.Login)
-	auth.Post("/refresh-token", h.RefreshToken)
-	auth.Post("/forgot-password", h.ForgotPassword)
-	auth.Post("/reset-password", h.ResetPassword)
-	auth.Post("/verify-email", h.VerifyEmail)
-	auth.Post("/resend-verification", h.ResendVerification)
-
-	auth.Get("/me", middleware.Auth(), h.Me)
+	r := router.Group("/auth")
+	r.Post("/login", h.Login)
+	r.Post("/register", h.Register)
+	r.Post("/resend-verification", h.ResendVerification)
+	r.Post("/verify-email", h.VerifyEmail)
+	r.Post("/forgot-password", h.ForgotPassword)
+	r.Post("/reset-password", h.ResetPassword)
+	r.Post("/refresh", h.Refresh)
 }

@@ -1,8 +1,14 @@
 package errors
 
-type AppError struct {
-	Code    int    `json:"code"`
+type FieldError struct {
+	Field   string `json:"field"`
 	Message string `json:"message"`
+}
+
+type AppError struct {
+	Code    int
+	Message string
+	Errors  []FieldError
 	cause   error
 }
 
@@ -14,16 +20,16 @@ func (e *AppError) Unwrap() error {
 	return e.cause
 }
 
-func NewBadRequestError(message string) *AppError {
-	return &AppError{Code: 400, Message: message}
+func Field(field, message string) FieldError {
+	return FieldError{Field: field, Message: message}
+}
+
+func NewBadRequestError(message string, fields ...FieldError) *AppError {
+	return &AppError{Code: 400, Message: message, Errors: fields}
 }
 
 func NewUnauthorizedError(message string) *AppError {
 	return &AppError{Code: 401, Message: message}
-}
-
-func NewPaymentRequiredError(message string) *AppError {
-	return &AppError{Code: 402, Message: message}
 }
 
 func NewForbiddenError(message string) *AppError {
@@ -34,12 +40,8 @@ func NewNotFoundError(message string) *AppError {
 	return &AppError{Code: 404, Message: message}
 }
 
-func NewConflictError(message string) *AppError {
-	return &AppError{Code: 409, Message: message}
-}
-
-func NewUnprocessableEntityError(message string) *AppError {
-	return &AppError{Code: 422, Message: message}
+func NewUnprocessableEntityError(message string, fields ...FieldError) *AppError {
+	return &AppError{Code: 422, Message: message, Errors: fields}
 }
 
 func NewTooManyRequestsError(message string) *AppError {
@@ -55,5 +57,5 @@ func NewServiceUnavailableError(message string) *AppError {
 }
 
 func Wrap(cause error, appErr *AppError) *AppError {
-	return &AppError{Code: appErr.Code, Message: appErr.Message, cause: cause}
+	return &AppError{Code: appErr.Code, Message: appErr.Message, Errors: appErr.Errors, cause: cause}
 }

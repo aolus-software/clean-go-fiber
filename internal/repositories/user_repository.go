@@ -2,19 +2,34 @@ package repositories
 
 import (
 	"context"
+	"slices"
+	"time"
 
 	"github.com/aolus-software/clean-go-fiber/internal/libs/pagination"
 	"github.com/aolus-software/clean-go-fiber/internal/models"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
-var userDatatableOptions = pagination.DatatableOptions{
-	AllowableFilter: []string{"name", "email", "status", "created_at", "updated_at"},
-	AllowableSort:   []string{"id", "name", "email", "status", "created_at", "updated_at"},
-	DefaultSort:     "created_at",
-	DefaultSortDir:  "desc",
-	DefaultPerPage:  10,
+var UserListOptions = pagination.Options{
+	Sortable: map[string]string{
+		"id":        "users.id",
+		"name":      "users.name",
+		"email":     "users.email",
+		"status":    "users.status",
+		"createdAt": "users.created_at",
+		"updatedAt": "users.updated_at",
+	},
+	Filterable: map[string]pagination.Filter{
+		"status":    {Column: "users.status", Kind: pagination.FilterEnum, Enum: models.UserStatuses},
+		"name":      {Column: "users.name", Kind: pagination.FilterText},
+		"email":     {Column: "users.email", Kind: pagination.FilterText},
+		"roleId":    {Kind: pagination.FilterID, Expr: "users.id IN (SELECT user_id FROM user_roles WHERE role_id IN ?)"},
+		"createdAt": {Column: "users.created_at", Kind: pagination.FilterDate},
+		"updatedAt": {Column: "users.updated_at", Kind: pagination.FilterDate},
+	},
+	SearchColumns: []string{"users.name", "users.email", "users.status::text"},
 }
 
 type userRepository struct {
@@ -29,93 +44,116 @@ func (r *userRepository) WithTx(tx *gorm.DB) UserRepository {
 	return &userRepository{db: tx}
 }
 
-func (r *userRepository) FindAll(ctx context.Context, queryParams *pagination.QueryParamDatatable) (*pagination.PaginationResponse[models.User], error) {
-	queryParams.ApplyDefaults(userDatatableOptions)
-	if err := queryParams.Validate(userDatatableOptions); err != nil {
-		return nil, err
-	}
-
-	query := r.db.WithContext(ctx).Model(&models.User{})
-
-	if queryParams.Search != "" {
-		query = query.Where("name ILIKE ? OR email ILIKE ?", "%"+queryParams.Search+"%", "%"+queryParams.Search+"%")
-	}
-
-	if len(queryParams.Filters) > 0 {
-		if queryParams.Filters["name"] != "" {
-			query = query.Where("name ILIKE ?", "%"+queryParams.Filters["name"]+"%")
-		}
-		if queryParams.Filters["email"] != "" {
-			query = query.Where("email ILIKE ?", "%"+queryParams.Filters["email"]+"%")
-		}
-		if queryParams.Filters["status"] != "" {
-			query = query.Where("status = ?", queryParams.Filters["status"])
-		}
-		if queryParams.Filters["created_at"] != "" {
-			query = query.Where("created_at::date = ?", queryParams.Filters["created_at"])
-		}
-		if queryParams.Filters["updated_at"] != "" {
-			query = query.Where("updated_at::date = ?", queryParams.Filters["updated_at"])
-		}
-	}
-
-	if queryParams.OrderBy != "" {
-		query = query.Order(queryParams.OrderBy + " " + queryParams.SortDirection)
+func (r *userRepository) FindAll(ctx context.Context, q *pagination.Query, tz *time.Location) ([]models.User, int64, error) {
+	query, err := q.Apply(r.db.WithContext(ctx).Model(&models.User{}), UserListOptions, tz)
+	if err != nil {
+		return nil, 0, err
 	}
 
 	var total int64
-	if err := query.Count(&total).Error; err != nil {
-		return nil, err
+	if err := query.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, err
 	}
 
 	var users []models.User
-	if err := query.Preload("Roles").Offset((queryParams.Page - 1) * queryParams.PerPage).Limit(queryParams.PerPage).Find(&users).Error; err != nil {
-		return nil, err
+	if err := query.Preload("Roles", func(db *gorm.DB) *gorm.DB { return db.Order("roles.name") }).
+		Offset(q.Offset()).Limit(q.PerPage).Find(&users).Error; err != nil {
+		return nil, 0, err
 	}
-
-	return &pagination.PaginationResponse[models.User]{
-		Total:       total,
-		PerPage:     queryParams.PerPage,
-		CurrentPage: queryParams.Page,
-		LastPage:    pagination.CalcLastPage(total, queryParams.PerPage),
-		Data:        users,
-	}, nil
+	return users, total, nil
 }
 
-func (r *userRepository) FindById(ctx context.Context, id uuid.UUID) (*models.User, error) {
+func (r *userRepository) FindByID(ctx context.Context, id uuid.UUID) (*models.User, error) {
 	var user models.User
-	if err := r.db.WithContext(ctx).Preload("Roles.Permissions").First(&user, "id = ?", id).Error; err != nil {
-		return nil, err
-	}
-	return &user, nil
+	err := r.db.WithContext(ctx).
+		Preload("Roles", func(db *gorm.DB) *gorm.DB { return db.Order("roles.name") }).
+		First(&user, "id = ?", id).Error
+	return notFoundAsNil(&user, err)
 }
 
-func (r *userRepository) FindByEmail(ctx context.Context, email string) (*models.User, error) {
+func (r *userRepository) FindLiveByEmail(ctx context.Context, email string, excludeID *uuid.UUID) (*models.User, error) {
 	var user models.User
-	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&user).Error; err != nil {
-		return nil, err
+	query := r.db.WithContext(ctx).Where("LOWER(email) = LOWER(?)", email)
+	if excludeID != nil {
+		query = query.Where("id <> ?", *excludeID)
 	}
-	return &user, nil
+	err := query.First(&user).Error
+	return notFoundAsNil(&user, err)
 }
 
-func (r *userRepository) Create(ctx context.Context, user *models.User) (*models.User, error) {
-	if err := r.db.WithContext(ctx).Create(user).Error; err != nil {
+func (r *userRepository) FindUserInformation(ctx context.Context, id uuid.UUID) (*UserInformation, error) {
+	var user models.User
+	err := r.db.WithContext(ctx).
+		Preload("Roles.Permissions").
+		Where("status = ?", models.UserStatusActive).
+		First(&user, "id = ?", id).Error
+	found, err := notFoundAsNil(&user, err)
+	if err != nil || found == nil {
 		return nil, err
 	}
-	return user, nil
+
+	info := &UserInformation{
+		ID:          user.ID.String(),
+		Name:        user.Name,
+		Email:       user.Email,
+		Roles:       []string{},
+		Permissions: []string{},
+	}
+	for _, role := range user.Roles {
+		info.Roles = append(info.Roles, role.Name)
+		for _, perm := range role.Permissions {
+			if !slices.Contains(info.Permissions, perm.Name) {
+				info.Permissions = append(info.Permissions, perm.Name)
+			}
+		}
+	}
+	slices.Sort(info.Roles)
+	slices.Sort(info.Permissions)
+	return info, nil
 }
 
-func (r *userRepository) Update(ctx context.Context, user *models.User) (*models.User, error) {
-	if err := r.db.WithContext(ctx).Save(user).Error; err != nil {
-		return nil, err
+func (r *userRepository) FindIDsByRoleIDs(ctx context.Context, roleIDs []uuid.UUID) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	if len(roleIDs) == 0 {
+		return ids, nil
 	}
-	return user, nil
+	err := r.db.WithContext(ctx).Table("user_roles").Distinct("user_id").
+		Where("role_id IN ?", roleIDs).Pluck("user_id", &ids).Error
+	return ids, err
+}
+
+func (r *userRepository) FindIDsByPermissionID(ctx context.Context, permissionID uuid.UUID) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	err := r.db.WithContext(ctx).Table("user_roles").Distinct("user_roles.user_id").
+		Joins("JOIN role_permissions ON role_permissions.role_id = user_roles.role_id").
+		Where("role_permissions.permission_id = ?", permissionID).
+		Pluck("user_roles.user_id", &ids).Error
+	return ids, err
+}
+
+func (r *userRepository) Create(ctx context.Context, user *models.User) error {
+	return r.db.WithContext(ctx).Omit(clause.Associations).Create(user).Error
+}
+
+func (r *userRepository) Update(ctx context.Context, user *models.User) error {
+	return r.db.WithContext(ctx).Omit(clause.Associations).Save(user).Error
 }
 
 func (r *userRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Delete(&models.User{}, "id = ?", id).Error
 }
 
-func (r *userRepository) SyncRoles(ctx context.Context, user *models.User, roles []models.Role) error {
-	return r.db.WithContext(ctx).Model(user).Association("Roles").Replace(roles)
+func (r *userRepository) ReplaceRoles(ctx context.Context, userID uuid.UUID, roleIDs []uuid.UUID) error {
+	db := r.db.WithContext(ctx)
+	if err := db.Exec("DELETE FROM user_roles WHERE user_id = ?", userID).Error; err != nil {
+		return err
+	}
+	if len(roleIDs) == 0 {
+		return nil
+	}
+	rows := make([]map[string]any, 0, len(roleIDs))
+	for _, roleID := range roleIDs {
+		rows = append(rows, map[string]any{"user_id": userID, "role_id": roleID})
+	}
+	return db.Table("user_roles").Clauses(clause.OnConflict{DoNothing: true}).Create(rows).Error
 }

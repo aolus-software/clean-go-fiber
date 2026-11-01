@@ -7,21 +7,31 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	UserStatusActive    = "active"
+	UserStatusInactive  = "inactive"
+	UserStatusSuspended = "suspended"
+	UserStatusBlocked   = "blocked"
+)
+
+var UserStatuses = []string{UserStatusActive, UserStatusInactive, UserStatusSuspended, UserStatusBlocked}
+
 type User struct {
-	ID              uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey;default:uuid_generate_v7()"`
-	Name            string         `json:"name" gorm:"type:varchar(255)"`
-	Email           string         `json:"email" gorm:"type:varchar(255);uniqueIndex"`
-	Password        string         `json:"-" gorm:"type:varchar(255)"`
-	Status          string         `json:"status" gorm:"type:varchar(255)"`
-	EmailVerifiedAt *time.Time     `json:"email_verified_at,omitempty" gorm:"type:timestamp;default:null"`
-	CreatedAt       time.Time      `json:"created_at" gorm:"type:timestamp;autoCreateTime"`
-	UpdatedAt       time.Time      `json:"updated_at" gorm:"type:timestamp;autoUpdateTime"`
-	DeletedAt       gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"type:timestamp;default:null"`
-	Roles           []Role         `json:"roles" gorm:"many2many:user_roles;"`
+	ID              uuid.UUID      `gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	Name            string         `gorm:"type:varchar(255);not null"`
+	Email           string         `gorm:"type:varchar(255);not null"`
+	Password        string         `gorm:"type:varchar(255);not null"`
+	Status          string         `gorm:"type:user_status;not null;default:active"`
+	Remark          *string        `gorm:"type:varchar(255)"`
+	EmailVerifiedAt *time.Time     `gorm:"type:timestamp"`
+	CreatedAt       time.Time      `gorm:"type:timestamp;autoCreateTime"`
+	UpdatedAt       time.Time      `gorm:"type:timestamp;autoUpdateTime"`
+	DeletedAt       gorm.DeletedAt `gorm:"type:timestamp"`
+	Roles           []Role         `gorm:"many2many:user_roles;"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) error {
-	if u.ID == (uuid.UUID{}) {
+	if u.ID == uuid.Nil {
 		u.ID = uuid.New()
 	}
 	return nil

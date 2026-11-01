@@ -1,13 +1,10 @@
 package profile
 
-import (
-	"github.com/aolus-software/clean-go-fiber/internal/middleware"
-	"github.com/gofiber/fiber/v2"
-)
+import "github.com/gofiber/fiber/v2"
 
-func (h *Handler) RegisterRoutes(router fiber.Router) {
-	p := router.Group("/profile", middleware.Auth())
-	p.Get("/me", h.GetProfile)
-	p.Patch("/me", h.UpdateProfile)
-	p.Patch("/me/password", h.ChangePassword)
+func (h *Handler) RegisterRoutes(router fiber.Router, auth fiber.Handler) {
+	r := router.Group("/profile", auth)
+	r.Get("", h.Get)
+	r.Patch("", h.Update)
+	r.Patch("/password", h.UpdatePassword)
 }

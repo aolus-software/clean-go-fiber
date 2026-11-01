@@ -1,8 +1,9 @@
 basePath: /
 definitions:
-  auth.ForgotPasswordRequest:
+  auth.EmailRequest:
     properties:
       email:
+        maxLength: 255
         type: string
     required:
     - email
@@ -12,175 +13,180 @@ definitions:
       email:
         type: string
       password:
+        minLength: 1
         type: string
     required:
     - email
     - password
     type: object
-  auth.RefreshTokenRequest:
+  auth.LoginResponse:
     properties:
-      refresh_token:
+      accessToken:
+        type: string
+      refreshToken:
+        type: string
+      user:
+        $ref: '#/definitions/repositories.UserInformation'
+    type: object
+  auth.RefreshRequest:
+    properties:
+      refreshToken:
+        minLength: 1
         type: string
     required:
-    - refresh_token
+    - refreshToken
+    type: object
+  auth.RefreshResponse:
+    properties:
+      accessToken:
+        type: string
+      refreshToken:
+        type: string
     type: object
   auth.RegisterRequest:
     properties:
-      confirm_password:
-        type: string
       email:
+        maxLength: 255
         type: string
       name:
         maxLength: 255
-        minLength: 2
+        minLength: 1
         type: string
       password:
         minLength: 8
         type: string
     required:
-    - confirm_password
     - email
     - name
     - password
     type: object
   auth.ResetPasswordRequest:
     properties:
-      confirm_password:
-        type: string
-      password:
+      newPassword:
         minLength: 8
         type: string
       token:
+        minLength: 1
         type: string
     required:
-    - confirm_password
-    - password
+    - newPassword
     - token
     type: object
-  auth.TokenResponse:
-    properties:
-      access_token:
-        type: string
-      refresh_token:
-        type: string
-      token_type:
-        type: string
-    type: object
-  auth.UserResponse:
-    properties:
-      email:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-    type: object
-  auth.VerifyEmailRequest:
+  auth.TokenRequest:
     properties:
       token:
+        minLength: 1
         type: string
     required:
     - token
     type: object
-  permissions.PermissionRequest:
+  errors.FieldError:
     properties:
-      modules:
-        maxLength: 255
-        minLength: 2
+      field:
         type: string
-      name:
-        maxLength: 255
-        minLength: 2
-        type: string
-    required:
-    - modules
-    - name
-    type: object
-  permissions.PermissionResponse:
-    properties:
-      created_at:
-        type: string
-      id:
-        type: string
-      modules:
-        type: string
-      name:
-        type: string
-      updated_at:
+      message:
         type: string
     type: object
-  profile.ChangePasswordRequest:
+  health.HealthResponse:
     properties:
-      confirm_password:
-        type: string
-      current_password:
-        type: string
-      password:
-        minLength: 8
-        type: string
-    required:
-    - confirm_password
-    - current_password
-    - password
-    type: object
-  profile.ProfileResponse:
-    properties:
-      email:
-        type: string
-      email_verified_at:
-        type: string
-      id:
-        type: string
-      name:
-        type: string
-      roles:
-        items:
-          $ref: '#/definitions/profile.RoleItem'
-        type: array
+      services:
+        $ref: '#/definitions/health.HealthServices'
       status:
         type: string
+      timestamp:
+        type: string
     type: object
-  profile.RoleItem:
+  health.HealthServices:
     properties:
+      database:
+        type: string
+      redis:
+        type: string
+    type: object
+  health.HomeResponse:
+    properties:
+      appEnv:
+        type: string
+      appName:
+        type: string
+      date:
+        type: string
+    type: object
+  health.LiveResponse:
+    properties:
+      alive:
+        type: boolean
+    type: object
+  permissions.CreatePermissionRequest:
+    properties:
+      group:
+        maxLength: 100
+        minLength: 1
+        type: string
+      name:
+        items:
+          type: string
+        minItems: 1
+        type: array
+    required:
+    - group
+    - name
+    type: object
+  permissions.PermissionList:
+    properties:
+      createdAt:
+        type: string
+      group:
+        type: string
       id:
         type: string
       name:
         type: string
+      updatedAt:
+        type: string
+    type: object
+  permissions.UpdatePermissionRequest:
+    properties:
+      group:
+        maxLength: 100
+        minLength: 1
+        type: string
+      name:
+        maxLength: 255
+        minLength: 1
+        type: string
+    required:
+    - group
+    - name
+    type: object
+  profile.UpdatePasswordRequest:
+    properties:
+      currentPassword:
+        minLength: 1
+        type: string
+      newPassword:
+        minLength: 8
+        type: string
+    required:
+    - currentPassword
+    - newPassword
     type: object
   profile.UpdateProfileRequest:
     properties:
+      email:
+        maxLength: 255
+        type: string
       name:
         maxLength: 255
-        minLength: 2
+        minLength: 1
         type: string
     required:
+    - email
     - name
     type: object
-  roles.PermissionItem:
+  repositories.UserInformation:
     properties:
-      created_at:
-        type: string
-      id:
-        type: string
-      modules:
-        type: string
-      name:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  roles.RoleRequest:
-    properties:
-      name:
-        maxLength: 255
-        minLength: 2
-        type: string
-    required:
-    - name
-    type: object
-  roles.RoleResponse:
-    properties:
-      created_at:
+      email:
         type: string
       id:
         type: string
@@ -188,98 +194,265 @@ definitions:
         type: string
       permissions:
         items:
-          $ref: '#/definitions/roles.PermissionItem'
+          type: string
         type: array
-      updated_at:
-        type: string
-    type: object
-  roles.SyncPermissionsRequest:
-    properties:
-      permission_ids:
+      roles:
         items:
           type: string
-        minItems: 1
+        type: array
+    type: object
+  roles.PermissionAssignment:
+    properties:
+      id:
+        type: string
+      isAssigned:
+        type: boolean
+      name:
+        type: string
+    type: object
+  roles.PermissionGroup:
+    properties:
+      group:
+        type: string
+      names:
+        items:
+          $ref: '#/definitions/roles.PermissionAssignment'
+        type: array
+    type: object
+  roles.RoleDetail:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      permissions:
+        items:
+          $ref: '#/definitions/roles.PermissionGroup'
+        type: array
+      updatedAt:
+        type: string
+    type: object
+  roles.RoleList:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  roles.RoleRequest:
+    properties:
+      name:
+        maxLength: 100
+        minLength: 1
+        type: string
+      permissionIds:
+        items:
+          type: string
         type: array
     required:
-    - permission_ids
+    - name
+    - permissionIds
+    type: object
+  selectoptions.PermissionGroupOption:
+    properties:
+      group:
+        type: string
+      permissions:
+        items:
+          $ref: '#/definitions/selectoptions.PermissionOption'
+        type: array
+    type: object
+  selectoptions.PermissionOption:
+    properties:
+      group:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  selectoptions.RoleOption:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
     type: object
   users.CreateUserRequest:
     properties:
       email:
+        maxLength: 255
         type: string
       name:
         maxLength: 255
-        minLength: 2
+        minLength: 1
         type: string
       password:
         minLength: 8
         type: string
+      remark:
+        maxLength: 255
+        type: string
+      roleIds:
+        items:
+          type: string
+        type: array
       status:
         enum:
         - active
         - inactive
+        - suspended
+        - blocked
         type: string
     required:
     - email
     - name
     - password
+    - roleIds
     - status
     type: object
-  users.RoleItem:
+  users.ResetPasswordRequest:
+    properties:
+      newPassword:
+        minLength: 8
+        type: string
+    required:
+    - newPassword
+    type: object
+  users.RoleOption:
     properties:
       id:
         type: string
       name:
         type: string
-    type: object
-  users.SyncRolesRequest:
-    properties:
-      role_ids:
-        items:
-          type: string
-        minItems: 1
-        type: array
-    required:
-    - role_ids
     type: object
   users.UpdateUserRequest:
     properties:
       email:
+        maxLength: 255
         type: string
       name:
         maxLength: 255
-        minLength: 2
+        minLength: 1
         type: string
+      remark:
+        maxLength: 255
+        type: string
+      roleIds:
+        items:
+          type: string
+        type: array
       status:
         enum:
         - active
         - inactive
+        - suspended
+        - blocked
         type: string
     required:
     - email
     - name
+    - roleIds
     - status
     type: object
-  users.UserResponse:
+  users.UserDetail:
     properties:
-      created_at:
+      createdAt:
         type: string
       email:
         type: string
-      email_verified_at:
+      emailVerifiedAt:
         type: string
       id:
         type: string
       name:
         type: string
+      remark:
+        type: string
       roles:
         items:
-          $ref: '#/definitions/users.RoleItem'
+          $ref: '#/definitions/users.RoleOption'
         type: array
       status:
         type: string
-      updated_at:
+      updatedAt:
         type: string
+    type: object
+  users.UserList:
+    properties:
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      remark:
+        type: string
+      roles:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  utils.ErrorResponse:
+    properties:
+      errors:
+        items:
+          $ref: '#/definitions/errors.FieldError'
+        type: array
+      message:
+        type: string
+      status:
+        type: integer
+      success:
+        type: boolean
+    type: object
+  utils.PaginatedData-permissions_PermissionList:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/permissions.PermissionList'
+        type: array
+      meta:
+        $ref: '#/definitions/utils.PaginationMeta'
+    type: object
+  utils.PaginatedData-roles_RoleList:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/roles.RoleList'
+        type: array
+      meta:
+        $ref: '#/definitions/utils.PaginationMeta'
+    type: object
+  utils.PaginatedData-users_UserList:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/users.UserList'
+        type: array
+      meta:
+        $ref: '#/definitions/utils.PaginationMeta'
+    type: object
+  utils.PaginationMeta:
+    properties:
+      limit:
+        type: integer
+      page:
+        type: integer
+      totalCount:
+        type: integer
     type: object
   utils.Response:
     properties:
@@ -287,11 +460,11 @@ definitions:
       message:
         type: string
       status:
-        type: string
+        type: integer
       success:
         type: boolean
     type: object
-host: localhost:8080
+host: localhost:3000
 info:
   contact: {}
   description: Production-ready Go REST API boilerplate
@@ -300,52 +473,54 @@ info:
 paths:
   /:
     get:
-      description: Returns service name and status
+      description: Application name, environment, and server time.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/utils.Response'
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/health.HomeResponse'
+              type: object
       summary: Root
       tags:
-      - health
+      - General
   /auth/forgot-password:
     post:
       consumes:
       - application/json
+      description: Always answers 200, whether or not the email is registered.
       parameters:
-      - description: Email address
+      - description: Email
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/auth.ForgotPasswordRequest'
+          $ref: '#/definitions/auth.EmailRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/utils.Response'
-        "400":
-          description: Bad Request
           schema:
             $ref: '#/definitions/utils.Response'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
-      summary: Request password reset email
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Request a password reset email
       tags:
-      - auth
+      - Authentication
   /auth/login:
     post:
       consumes:
       - application/json
       parameters:
-      - description: Login credentials
+      - description: Credentials
         in: body
         name: body
         required: true
@@ -361,47 +536,24 @@ paths:
             - $ref: '#/definitions/utils.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/auth.TokenResponse'
+                  $ref: '#/definitions/auth.LoginResponse'
               type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
         "422":
           description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "429":
+          description: Too Many Requests
           schema:
             $ref: '#/definitions/utils.Response'
       summary: Login
       tags:
-      - auth
-  /auth/me:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/auth.UserResponse'
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/utils.Response'
-      security:
-      - BearerAuth: []
-      summary: Get current user
-      tags:
-      - auth
-  /auth/refresh-token:
+      - Authentication
+  /auth/refresh:
     post:
       consumes:
       - application/json
@@ -411,7 +563,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/auth.RefreshTokenRequest'
+          $ref: '#/definitions/auth.RefreshRequest'
       produces:
       - application/json
       responses:
@@ -422,12 +574,8 @@ paths:
             - $ref: '#/definitions/utils.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/auth.TokenResponse'
+                  $ref: '#/definitions/auth.RefreshResponse'
               type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/utils.Response'
         "401":
           description: Unauthorized
           schema:
@@ -435,10 +583,10 @@ paths:
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
-      summary: Refresh access token
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Exchange a refresh token for a new token pair
       tags:
-      - auth
+      - Authentication
   /auth/register:
     post:
       consumes:
@@ -456,27 +604,45 @@ paths:
         "201":
           description: Created
           schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/auth.UserResponse'
-              type: object
+            $ref: '#/definitions/utils.Response'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.Response'
-        "409":
-          description: Conflict
+            $ref: '#/definitions/utils.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Register a new account
+      tags:
+      - Authentication
+  /auth/resend-verification:
+    post:
+      consumes:
+      - application/json
+      description: Always answers 200, whether or not the email is registered or already
+        verified.
+      parameters:
+      - description: Email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/auth.EmailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
           schema:
             $ref: '#/definitions/utils.Response'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
-      summary: Register a new user
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Resend the verification email
       tags:
-      - auth
+      - Authentication
   /auth/reset-password:
     post:
       consumes:
@@ -498,14 +664,14 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
-      summary: Reset password using token
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Reset a password with a reset token
       tags:
-      - auth
+      - Authentication
   /auth/verify-email:
     post:
       consumes:
@@ -516,7 +682,7 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/auth.VerifyEmailRequest'
+          $ref: '#/definitions/auth.TokenRequest'
       produces:
       - application/json
       responses:
@@ -527,134 +693,43 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
-      summary: Verify email address
+            $ref: '#/definitions/utils.ErrorResponse'
+      summary: Verify an email address
       tags:
-      - auth
+      - Authentication
   /health:
     get:
-      description: Returns service health status
+      description: Probes PostgreSQL and Redis; 503 when either fails.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/utils.Response'
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/health.HealthResponse'
+              type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/health.HealthResponse'
+              type: object
       summary: Health check
       tags:
-      - health
-  /permissions:
+      - General
+  /live:
     get:
-      parameters:
-      - description: Page
-        in: query
-        name: page
-        type: integer
-      - description: Per page
-        in: query
-        name: per_page
-        type: integer
-      - description: Search
-        in: query
-        name: search
-        type: string
-      - description: Order by
-        in: query
-        name: order_by
-        type: string
-      - description: Sort direction
-        in: query
-        name: sort_direction
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/utils.Response'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/utils.Response'
-      security:
-      - BearerAuth: []
-      summary: List permissions
-      tags:
-      - permissions
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Permission data
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/permissions.PermissionRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/permissions.PermissionResponse'
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/utils.Response'
-        "422":
-          description: Unprocessable Entity
-          schema:
-            $ref: '#/definitions/utils.Response'
-      security:
-      - BearerAuth: []
-      summary: Create permission
-      tags:
-      - permissions
-  /permissions/{id}:
-    delete:
-      parameters:
-      - description: Permission ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/utils.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/utils.Response'
-      security:
-      - BearerAuth: []
-      summary: Delete permission
-      tags:
-      - permissions
-    get:
-      parameters:
-      - description: Permission ID
-        in: path
-        name: id
-        required: true
-        type: string
       produces:
       - application/json
       responses:
@@ -665,93 +740,40 @@ paths:
             - $ref: '#/definitions/utils.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/permissions.PermissionResponse'
+                  $ref: '#/definitions/health.LiveResponse'
+              type: object
+      summary: Liveness probe
+      tags:
+      - General
+  /profile:
+    get:
+      description: Returns the caller's identity, roles, and permissions.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/repositories.UserInformation'
               type: object
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/utils.Response'
       security:
       - BearerAuth: []
-      summary: Get permission by ID
+      summary: Get own profile
       tags:
-      - permissions
+      - Profile
     patch:
       consumes:
       - application/json
       parameters:
-      - description: Permission ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Permission data
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/permissions.PermissionRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/permissions.PermissionResponse'
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/utils.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/utils.Response'
-        "422":
-          description: Unprocessable Entity
-          schema:
-            $ref: '#/definitions/utils.Response'
-      security:
-      - BearerAuth: []
-      summary: Update permission
-      tags:
-      - permissions
-  /profile/me:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/profile.ProfileResponse'
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/utils.Response'
-      security:
-      - BearerAuth: []
-      summary: Get current user profile
-      tags:
-      - profile
-    patch:
-      consumes:
-      - application/json
-      parameters:
-      - description: Profile data
+      - description: Profile
         in: body
         name: body
         required: true
@@ -767,12 +789,12 @@ paths:
             - $ref: '#/definitions/utils.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/profile.ProfileResponse'
+                  $ref: '#/definitions/repositories.UserInformation'
               type: object
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
@@ -780,23 +802,25 @@ paths:
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Update current user profile
+      summary: Update own profile
       tags:
-      - profile
-  /profile/me/password:
+      - Profile
+  /profile/password:
     patch:
       consumes:
       - application/json
+      description: Checks the current password, then stores the new one and clears
+        the cached user information.
       parameters:
-      - description: Password change data
+      - description: Passwords
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/profile.ChangePasswordRequest'
+          $ref: '#/definitions/profile.UpdatePasswordRequest'
       produces:
       - application/json
       responses:
@@ -807,7 +831,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
@@ -815,34 +839,119 @@ paths:
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Change current user password
+      summary: Change own password
       tags:
-      - profile
-  /roles:
+      - Profile
+  /settings/permissions:
     get:
+      description: 'Requires ''permission list'' permission. Filters: filter[name],
+        filter[group], filter[createdAt], filter[updatedAt] (YYYY-MM-DD or start,end).'
       parameters:
-      - description: Page
+      - description: Page (>= 1)
         in: query
         name: page
         type: integer
-      - description: Per page
+      - description: Page size (1-100)
         in: query
-        name: per_page
+        name: perPage
         type: integer
-      - description: Search
+      - description: Search name, group
         in: query
         name: search
         type: string
-      - description: Order by
+      - description: id, name, group, createdAt, updatedAt
         in: query
-        name: order_by
+        name: sort
         type: string
-      - description: Sort direction
+      - description: asc or desc
         in: query
-        name: sort_direction
+        name: sortDirection
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/utils.PaginatedData-permissions_PermissionList'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List permissions
+      tags:
+      - Settings/Permissions
+    post:
+      consumes:
+      - application/json
+      description: Creates one permission per entry in name, stored as "<group> <name>".
+        Requires 'permission create' permission.
+      parameters:
+      - description: Group and actions
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/permissions.CreatePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create permissions
+      tags:
+      - Settings/Permissions
+  /settings/permissions/{id}:
+    delete:
+      description: Hard delete; role grants cascade. Requires 'permission delete'
+        permission.
+      parameters:
+      - description: Permission ID (uuid)
+        in: path
+        name: id
+        required: true
         type: string
       produces:
       - application/json
@@ -855,16 +964,177 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete permission
+      tags:
+      - Settings/Permissions
+    get:
+      description: Requires 'permission detail' permission.
+      parameters:
+      - description: Permission ID (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/permissions.PermissionList'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Permission detail
+      tags:
+      - Settings/Permissions
+    patch:
+      consumes:
+      - application/json
+      description: name is stored verbatim, so send the full "<group> <action>" string.
+        Requires 'permission edit' permission.
+      parameters:
+      - description: Permission ID (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Permission
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/permissions.UpdatePermissionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update permission
+      tags:
+      - Settings/Permissions
+  /settings/roles:
+    get:
+      description: 'Requires ''role list'' permission. Filters: filter[name], filter[createdAt],
+        filter[updatedAt] (YYYY-MM-DD or start,end).'
+      parameters:
+      - description: Page (>= 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (1-100)
+        in: query
+        name: perPage
+        type: integer
+      - description: Search name
+        in: query
+        name: search
+        type: string
+      - description: id, name, createdAt, updatedAt
+        in: query
+        name: sort
+        type: string
+      - description: asc or desc
+        in: query
+        name: sortDirection
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/utils.PaginatedData-roles_RoleList'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List roles
       tags:
-      - roles
+      - Settings/Roles
     post:
       consumes:
       - application/json
+      description: Requires 'role create' permission.
       parameters:
-      - description: Role data
+      - description: Role
         in: body
         name: body
         required: true
@@ -876,29 +1146,34 @@ paths:
         "201":
           description: Created
           schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/roles.RoleResponse'
-              type: object
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create role
       tags:
-      - roles
-  /roles/{id}:
+      - Settings/Roles
+  /settings/roles/{id}:
     delete:
+      description: Hard delete; assignments cascade. Requires 'role delete' permission.
+        The superuser role cannot be deleted.
       parameters:
-      - description: Role ID
+      - description: Role ID (uuid)
         in: path
         name: id
         required: true
@@ -906,24 +1181,36 @@ paths:
       produces:
       - application/json
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete role
       tags:
-      - roles
+      - Settings/Roles
     get:
+      description: Every permission, grouped, with isAssigned for this role. Requires
+        'role detail' permission.
       parameters:
-      - description: Role ID
+      - description: Role ID (uuid)
         in: path
         name: id
         required: true
@@ -938,31 +1225,41 @@ paths:
             - $ref: '#/definitions/utils.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/roles.RoleResponse'
+                  $ref: '#/definitions/roles.RoleDetail'
               type: object
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get role by ID
+      summary: Role detail
       tags:
-      - roles
+      - Settings/Roles
     patch:
       consumes:
       - application/json
+      description: Replace a role's name and permissions. Requires 'role edit' permission.
+        The superuser role cannot be renamed.
       parameters:
-      - description: Role ID
+      - description: Role ID (uuid)
         in: path
         name: id
         required: true
         type: string
-      - description: Role data
+      - description: Role
         in: body
         name: body
         required: true
@@ -974,14 +1271,17 @@ paths:
         "200":
           description: OK
           schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/roles.RoleResponse'
-              type: object
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
         "404":
@@ -991,28 +1291,15 @@ paths:
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update role
       tags:
-      - roles
-  /roles/{id}/permissions:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Role ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Permission IDs
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/roles.SyncPermissionsRequest'
+      - Settings/Roles
+  /settings/select-options/permissions:
+    get:
+      description: Every permission grouped by group. Requires the 'superuser' role.
       produces:
       - application/json
       responses:
@@ -1023,47 +1310,80 @@ paths:
             - $ref: '#/definitions/utils.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/roles.RoleResponse'
+                  items:
+                    $ref: '#/definitions/selectoptions.PermissionGroupOption'
+                  type: array
               type: object
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/utils.Response'
-        "422":
-          description: Unprocessable Entity
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
       security:
       - BearerAuth: []
-      summary: Sync role permissions
+      summary: Permission options
       tags:
-      - roles
-  /users:
+      - Settings/Select Options
+  /settings/select-options/roles:
     get:
+      description: Every role except superuser, ordered by name. Requires the 'superuser'
+        role.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/selectoptions.RoleOption'
+                  type: array
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+      security:
+      - BearerAuth: []
+      summary: Role options
+      tags:
+      - Settings/Select Options
+  /settings/users:
+    get:
+      description: 'Paginated list of live users. Requires ''user list'' permission.
+        Filters: filter[status] (comma list of active,inactive,suspended,blocked),
+        filter[name], filter[email], filter[roleId] (comma list of uuids), filter[createdAt],
+        filter[updatedAt] (YYYY-MM-DD or start,end).'
       parameters:
-      - description: Page
+      - description: Page (>= 1)
         in: query
         name: page
         type: integer
-      - description: Per page
+      - description: Page size (1-100)
         in: query
-        name: per_page
+        name: perPage
         type: integer
-      - description: Search
+      - description: Search name, email, status
         in: query
         name: search
         type: string
-      - description: Order by
+      - description: id, name, email, status, createdAt, updatedAt
         in: query
-        name: order_by
+        name: sort
         type: string
-      - description: Sort direction
+      - description: asc or desc
         in: query
-        name: sort_direction
+        name: sortDirection
         type: string
       produces:
       - application/json
@@ -1071,21 +1391,40 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/utils.Response'
+            allOf:
+            - $ref: '#/definitions/utils.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/utils.PaginatedData-users_UserList'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
             $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: List users
       tags:
-      - users
+      - Settings/Users
     post:
       consumes:
       - application/json
+      description: Requires 'user create' permission. Only a superuser may assign
+        the superuser role.
       parameters:
-      - description: User data
+      - description: User
         in: body
         name: body
         required: true
@@ -1097,29 +1436,34 @@ paths:
         "201":
           description: Created
           schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/users.UserResponse'
-              type: object
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Create user
       tags:
-      - users
-  /users/{id}:
+      - Settings/Users
+  /settings/users/{id}:
     delete:
+      description: Soft delete. Requires 'user delete' permission. Only a superuser
+        may delete a superuser account.
       parameters:
-      - description: User ID
+      - description: User ID (uuid)
         in: path
         name: id
         required: true
@@ -1127,24 +1471,35 @@ paths:
       produces:
       - application/json
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Delete user
       tags:
-      - users
+      - Settings/Users
     get:
+      description: Requires 'user detail' permission.
       parameters:
-      - description: User ID
+      - description: User ID (uuid)
         in: path
         name: id
         required: true
@@ -1159,31 +1514,42 @@ paths:
             - $ref: '#/definitions/utils.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/users.UserResponse'
+                  $ref: '#/definitions/users.UserDetail'
               type: object
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Get user by ID
+      summary: User detail
       tags:
-      - users
+      - Settings/Users
     patch:
       consumes:
       - application/json
+      description: Full replace of name, email, status, remark, roleIds. Requires
+        'user edit' permission. Only a superuser may modify a superuser account or
+        assign the superuser role.
       parameters:
-      - description: User ID
+      - description: User ID (uuid)
         in: path
         name: id
         required: true
         type: string
-      - description: User data
+      - description: User
         in: body
         name: body
         required: true
@@ -1195,14 +1561,17 @@ paths:
         "200":
           description: OK
           schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/users.UserResponse'
-              type: object
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
         "404":
@@ -1212,42 +1581,46 @@ paths:
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
       summary: Update user
       tags:
-      - users
-  /users/{id}/roles:
+      - Settings/Users
+  /settings/users/{id}/reset-password:
     post:
       consumes:
       - application/json
+      description: Requires the 'superuser' role.
       parameters:
-      - description: User ID
+      - description: User ID (uuid)
         in: path
         name: id
         required: true
         type: string
-      - description: Role IDs
+      - description: New password
         in: body
         name: body
         required: true
         schema:
-          $ref: '#/definitions/users.SyncRolesRequest'
+          $ref: '#/definitions/users.ResetPasswordRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            allOf:
-            - $ref: '#/definitions/utils.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/users.UserResponse'
-              type: object
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/utils.Response'
         "404":
@@ -1257,12 +1630,90 @@ paths:
         "422":
           description: Unprocessable Entity
           schema:
-            $ref: '#/definitions/utils.Response'
+            $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAuth: []
-      summary: Sync user roles
+      summary: Reset a user's password
       tags:
-      - users
+      - Settings/Users
+  /settings/users/{id}/send-reset-password-email:
+    post:
+      description: Requires 'user create' permission.
+      parameters:
+      - description: User ID (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Send a password reset email to a user
+      tags:
+      - Settings/Users
+  /settings/users/{id}/send-verification-email:
+    post:
+      description: Requires 'user create' permission.
+      parameters:
+      - description: User ID (uuid)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/utils.Response'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Send a verification email to a user
+      tags:
+      - Settings/Users
 securityDefinitions:
   BearerAuth:
     in: header

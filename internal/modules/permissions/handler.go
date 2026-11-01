@@ -3,7 +3,6 @@ package permissions
 import (
 	"github.com/aolus-software/clean-go-fiber/internal/libs/pagination"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
-	"github.com/aolus-software/clean-go-fiber/internal/libs/validator"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -16,113 +15,130 @@ func NewHandler(service Service) *Handler {
 }
 
 // @Summary     List permissions
-// @Tags        permissions
+// @Description Requires 'permission list' permission. Filters: filter[name], filter[group], filter[createdAt], filter[updatedAt] (YYYY-MM-DD or start,end).
+// @Tags        Settings/Permissions
 // @Produce     json
 // @Security    BearerAuth
-// @Param       page            query  int     false  "Page"
-// @Param       per_page        query  int     false  "Per page"
-// @Param       search          query  string  false  "Search"
-// @Param       order_by        query  string  false  "Order by"
-// @Param       sort_direction  query  string  false  "Sort direction"
-// @Success     200  {object}  utils.Response
+// @Param       page           query  int     false  "Page (>= 1)"
+// @Param       perPage        query  int     false  "Page size (1-100)"
+// @Param       search         query  string  false  "Search name, group"
+// @Param       sort           query  string  false  "id, name, group, createdAt, updatedAt"
+// @Param       sortDirection  query  string  false  "asc or desc"
+// @Success     200  {object}  utils.Response{data=utils.PaginatedData[permissions.PermissionList]}
+// @Failure     400  {object}  utils.ErrorResponse
 // @Failure     401  {object}  utils.Response
-// @Router      /permissions [get]
+// @Failure     403  {object}  utils.Response
+// @Failure     422  {object}  utils.ErrorResponse
+// @Router      /settings/permissions [get]
 func (h *Handler) List(c *fiber.Ctx) error {
-	q := pagination.ParseFromFiber(c)
+	q, err := pagination.Parse(c)
+	if err != nil {
+		return err
+	}
 	result, err := h.service.List(c.Context(), q)
 	if err != nil {
 		return err
 	}
-	return utils.OK(c, result)
+	return utils.OK(c, "Permissions retrieved", result)
 }
 
-// @Summary     Get permission by ID
-// @Tags        permissions
-// @Produce     json
-// @Security    BearerAuth
-// @Param       id   path      string  true  "Permission ID"
-// @Success     200  {object}  utils.Response{data=permissions.PermissionResponse}
-// @Failure     401  {object}  utils.Response
-// @Failure     404  {object}  utils.Response
-// @Router      /permissions/{id} [get]
-func (h *Handler) Get(c *fiber.Ctx) error {
-	result, err := h.service.GetByID(c.Context(), c.Params("id"))
-	if err != nil {
-		return err
-	}
-	return utils.OK(c, result)
-}
-
-// @Summary     Create permission
-// @Tags        permissions
+// @Summary     Create permissions
+// @Description Creates one permission per entry in name, stored as "<group> <name>". Requires 'permission create' permission.
+// @Tags        Settings/Permissions
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       body  body      permissions.PermissionRequest  true  "Permission data"
-// @Success     201   {object}  utils.Response{data=permissions.PermissionResponse}
+// @Param       body  body      permissions.CreatePermissionRequest  true  "Group and actions"
+// @Success     201   {object}  utils.Response
+// @Failure     400   {object}  utils.ErrorResponse
 // @Failure     401   {object}  utils.Response
-// @Failure     422   {object}  utils.Response
-// @Router      /permissions [post]
+// @Failure     403   {object}  utils.Response
+// @Failure     422   {object}  utils.ErrorResponse
+// @Router      /settings/permissions [post]
 func (h *Handler) Create(c *fiber.Ctx) error {
-	var req PermissionRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.ErrBadRequest
+	var req CreatePermissionRequest
+	if err := utils.ParseBody(c, &req); err != nil {
+		return err
 	}
-	if err := validator.Validate(&req); err != nil {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"errors":  err,
-		})
+	if err := h.service.Create(c.Context(), &req); err != nil {
+		return err
 	}
-	result, err := h.service.Create(c.Context(), &req)
+	return utils.Created(c, "Permissions created", nil)
+}
+
+// @Summary     Permission detail
+// @Description Requires 'permission detail' permission.
+// @Tags        Settings/Permissions
+// @Produce     json
+// @Security    BearerAuth
+// @Param       id   path      string  true  "Permission ID (uuid)"
+// @Success     200  {object}  utils.Response{data=permissions.PermissionList}
+// @Failure     401  {object}  utils.Response
+// @Failure     403  {object}  utils.Response
+// @Failure     404  {object}  utils.Response
+// @Failure     422  {object}  utils.ErrorResponse
+// @Router      /settings/permissions/{id} [get]
+func (h *Handler) Detail(c *fiber.Ctx) error {
+	id, err := utils.ParamUUID(c, "id")
 	if err != nil {
 		return err
 	}
-	return utils.Created(c, result)
+	result, err := h.service.Detail(c.Context(), id)
+	if err != nil {
+		return err
+	}
+	return utils.OK(c, "Permission retrieved", result)
 }
 
 // @Summary     Update permission
-// @Tags        permissions
+// @Description name is stored verbatim, so send the full "<group> <action>" string. Requires 'permission edit' permission.
+// @Tags        Settings/Permissions
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       id    path      string                         true  "Permission ID"
-// @Param       body  body      permissions.PermissionRequest  true  "Permission data"
-// @Success     200   {object}  utils.Response{data=permissions.PermissionResponse}
+// @Param       id    path      string                               true  "Permission ID (uuid)"
+// @Param       body  body      permissions.UpdatePermissionRequest  true  "Permission"
+// @Success     200   {object}  utils.Response
+// @Failure     400   {object}  utils.ErrorResponse
 // @Failure     401   {object}  utils.Response
+// @Failure     403   {object}  utils.Response
 // @Failure     404   {object}  utils.Response
-// @Failure     422   {object}  utils.Response
-// @Router      /permissions/{id} [patch]
+// @Failure     422   {object}  utils.ErrorResponse
+// @Router      /settings/permissions/{id} [patch]
 func (h *Handler) Update(c *fiber.Ctx) error {
-	var req PermissionRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.ErrBadRequest
-	}
-	if err := validator.Validate(&req); err != nil {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"errors":  err,
-		})
-	}
-	result, err := h.service.Update(c.Context(), c.Params("id"), &req)
+	id, err := utils.ParamUUID(c, "id")
 	if err != nil {
 		return err
 	}
-	return utils.OK(c, result)
+	var req UpdatePermissionRequest
+	if err := utils.ParseBody(c, &req); err != nil {
+		return err
+	}
+	if err := h.service.Update(c.Context(), id, &req); err != nil {
+		return err
+	}
+	return utils.OK(c, "Permission updated", nil)
 }
 
 // @Summary     Delete permission
-// @Tags        permissions
+// @Description Hard delete; role grants cascade. Requires 'permission delete' permission.
+// @Tags        Settings/Permissions
 // @Produce     json
 // @Security    BearerAuth
-// @Param       id   path  string  true  "Permission ID"
-// @Success     204
+// @Param       id   path      string  true  "Permission ID (uuid)"
+// @Success     200  {object}  utils.Response
 // @Failure     401  {object}  utils.Response
+// @Failure     403  {object}  utils.Response
 // @Failure     404  {object}  utils.Response
-// @Router      /permissions/{id} [delete]
+// @Failure     422  {object}  utils.ErrorResponse
+// @Router      /settings/permissions/{id} [delete]
 func (h *Handler) Delete(c *fiber.Ctx) error {
-	if err := h.service.Delete(c.Context(), c.Params("id")); err != nil {
+	id, err := utils.ParamUUID(c, "id")
+	if err != nil {
 		return err
 	}
-	return utils.NoContent(c)
+	if err := h.service.Delete(c.Context(), id); err != nil {
+		return err
+	}
+	return utils.OK(c, "Permission deleted", nil)
 }

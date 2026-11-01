@@ -3,9 +3,11 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -37,8 +39,15 @@ func (c *Cache) Set(ctx context.Context, key string, value any, ttl time.Duratio
 	return c.client.Set(ctx, key, data, ttl).Err()
 }
 
-func (c *Cache) Delete(ctx context.Context, key string) error {
-	return c.client.Del(ctx, key).Err()
+func (c *Cache) Delete(ctx context.Context, keys ...string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+	return c.client.Del(ctx, keys...).Err()
+}
+
+func (c *Cache) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx).Err()
 }
 
 func (c *Cache) Flush(ctx context.Context) error {
@@ -65,4 +74,29 @@ func (c *Cache) Remember(ctx context.Context, key string, ttl time.Duration, des
 		return err
 	}
 	return json.Unmarshal(data, dest)
+}
+
+func (c *Cache) RefreshTokenID(ctx context.Context, id uuid.UUID) (string, error) {
+	var tokenID string
+	err := c.Get(ctx, Key(RefreshTokenKey, id.String()), &tokenID)
+	if errors.Is(err, redis.Nil) {
+		return "", nil
+	}
+	return tokenID, err
+}
+
+func (c *Cache) RevokeSessions(ctx context.Context, ids ...uuid.UUID) error {
+	keys := make([]string, 0, len(ids)*2)
+	for _, id := range ids {
+		keys = append(keys, Key(UserInformationKey, id.String()), Key(RefreshTokenKey, id.String()))
+	}
+	return c.Delete(ctx, keys...)
+}
+
+func (c *Cache) ForgetUsers(ctx context.Context, ids ...uuid.UUID) error {
+	keys := make([]string, 0, len(ids))
+	for _, id := range ids {
+		keys = append(keys, Key(UserInformationKey, id.String()))
+	}
+	return c.Delete(ctx, keys...)
 }
