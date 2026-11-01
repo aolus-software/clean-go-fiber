@@ -17,19 +17,31 @@ const docTemplate = `{
     "paths": {
         "/": {
             "get": {
-                "description": "Returns service name and status",
+                "description": "Application name, environment, and server time.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "health"
+                    "General"
                 ],
                 "summary": "Root",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/health.HomeResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -37,6 +49,7 @@ const docTemplate = `{
         },
         "/auth/forgot-password": {
             "post": {
+                "description": "Always answers 200, whether or not the email is registered.",
                 "consumes": [
                     "application/json"
                 ],
@@ -44,17 +57,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Authentication"
                 ],
-                "summary": "Request password reset email",
+                "summary": "Request a password reset email",
                 "parameters": [
                     {
-                        "description": "Email address",
+                        "description": "Email",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.ForgotPasswordRequest"
+                            "$ref": "#/definitions/auth.EmailRequest"
                         }
                     }
                 ],
@@ -65,16 +78,10 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.Response"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -89,12 +96,12 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Authentication"
                 ],
                 "summary": "Login",
                 "parameters": [
                     {
-                        "description": "Login credentials",
+                        "description": "Credentials",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -115,7 +122,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/auth.TokenResponse"
+                                            "$ref": "#/definitions/auth.LoginResponse"
                                         }
                                     }
                                 }
@@ -125,59 +132,17 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/me": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Get current user",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/auth.UserResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "429": {
+                        "description": "Too Many Requests",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
                         }
@@ -185,7 +150,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/refresh-token": {
+        "/auth/refresh": {
             "post": {
                 "consumes": [
                     "application/json"
@@ -194,9 +159,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Authentication"
                 ],
-                "summary": "Refresh access token",
+                "summary": "Exchange a refresh token for a new token pair",
                 "parameters": [
                     {
                         "description": "Refresh token",
@@ -204,7 +169,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.RefreshTokenRequest"
+                            "$ref": "#/definitions/auth.RefreshRequest"
                         }
                     }
                 ],
@@ -220,17 +185,11 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/auth.TokenResponse"
+                                            "$ref": "#/definitions/auth.RefreshResponse"
                                         }
                                     }
                                 }
                             ]
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
                         }
                     },
                     "401": {
@@ -242,7 +201,7 @@ const docTemplate = `{
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -257,9 +216,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Authentication"
                 ],
-                "summary": "Register a new user",
+                "summary": "Register a new account",
                 "parameters": [
                     {
                         "description": "Registration data",
@@ -275,29 +234,51 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/auth.UserResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/utils.Response"
                         }
                     },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
-                    "409": {
-                        "description": "Conflict",
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/resend-verification": {
+            "post": {
+                "description": "Always answers 200, whether or not the email is registered or already verified.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Resend the verification email",
+                "parameters": [
+                    {
+                        "description": "Email",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/auth.EmailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
                         }
@@ -305,7 +286,7 @@ const docTemplate = `{
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -320,9 +301,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Authentication"
                 ],
-                "summary": "Reset password using token",
+                "summary": "Reset a password with a reset token",
                 "parameters": [
                     {
                         "description": "Reset token and new password",
@@ -344,13 +325,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -365,9 +346,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "auth"
+                    "Authentication"
                 ],
-                "summary": "Verify email address",
+                "summary": "Verify an email address",
                 "parameters": [
                     {
                         "description": "Verification token",
@@ -375,7 +356,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/auth.VerifyEmailRequest"
+                            "$ref": "#/definitions/auth.TokenRequest"
                         }
                     }
                 ],
@@ -389,13 +370,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -403,116 +384,18 @@ const docTemplate = `{
         },
         "/health": {
             "get": {
-                "description": "Returns service health status",
+                "description": "Probes PostgreSQL and Redis; 503 when either fails.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "health"
+                    "General"
                 ],
                 "summary": "Health check",
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/permissions": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "permissions"
-                ],
-                "summary": "List permissions",
-                "parameters": [
-                    {
-                        "type": "integer",
-                        "description": "Page",
-                        "name": "page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Per page",
-                        "name": "per_page",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Search",
-                        "name": "search",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Order by",
-                        "name": "order_by",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Sort direction",
-                        "name": "sort_direction",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "permissions"
-                ],
-                "summary": "Create permission",
-                "parameters": [
-                    {
-                        "description": "Permission data",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/permissions.PermissionRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
                             "allOf": [
                                 {
                                     "$ref": "#/definitions/utils.Response"
@@ -521,51 +404,80 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/permissions.PermissionResponse"
+                                            "$ref": "#/definitions/health.HealthResponse"
                                         }
                                     }
                                 }
                             ]
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
-                    "422": {
-                        "description": "Unprocessable Entity",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/health.HealthResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
             }
         },
-        "/permissions/{id}": {
+        "/live": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "General"
+                ],
+                "summary": "Liveness probe",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/health.LiveResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/profile": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
+                "description": "Returns the caller's identity, roles, and permissions.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "permissions"
+                    "Profile"
                 ],
-                "summary": "Get permission by ID",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Permission ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
+                "summary": "Get own profile",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -578,168 +490,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/permissions.PermissionResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "permissions"
-                ],
-                "summary": "Delete permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Permission ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    }
-                }
-            },
-            "patch": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "permissions"
-                ],
-                "summary": "Update permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Permission ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Permission data",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/permissions.PermissionRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/permissions.PermissionResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
-                    "422": {
-                        "description": "Unprocessable Entity",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/profile/me": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "profile"
-                ],
-                "summary": "Get current user profile",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/profile.ProfileResponse"
+                                            "$ref": "#/definitions/repositories.UserInformation"
                                         }
                                     }
                                 }
@@ -767,12 +518,12 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "profile"
+                    "Profile"
                 ],
-                "summary": "Update current user profile",
+                "summary": "Update own profile",
                 "parameters": [
                     {
-                        "description": "Profile data",
+                        "description": "Profile",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -793,7 +544,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/profile.ProfileResponse"
+                                            "$ref": "#/definitions/repositories.UserInformation"
                                         }
                                     }
                                 }
@@ -803,7 +554,7 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
@@ -815,19 +566,20 @@ const docTemplate = `{
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/profile/me/password": {
+        "/profile/password": {
             "patch": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
+                "description": "Checks the current password, then stores the new one and clears the cached user information.",
                 "consumes": [
                     "application/json"
                 ],
@@ -835,17 +587,17 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "profile"
+                    "Profile"
                 ],
-                "summary": "Change current user password",
+                "summary": "Change own password",
                 "parameters": [
                     {
-                        "description": "Password change data",
+                        "description": "Passwords",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/profile.ChangePasswordRequest"
+                            "$ref": "#/definitions/profile.UpdatePasswordRequest"
                         }
                     }
                 ],
@@ -859,7 +611,7 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
@@ -871,55 +623,56 @@ const docTemplate = `{
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/roles": {
+        "/settings/permissions": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
+                "description": "Requires 'permission list' permission. Filters: filter[name], filter[group], filter[createdAt], filter[updatedAt] (YYYY-MM-DD or start,end).",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "roles"
+                    "Settings/Permissions"
                 ],
-                "summary": "List roles",
+                "summary": "List permissions",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page",
+                        "description": "Page (\u003e= 1)",
                         "name": "page",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Per page",
-                        "name": "per_page",
+                        "description": "Page size (1-100)",
+                        "name": "perPage",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Search",
+                        "description": "Search name, group",
                         "name": "search",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Order by",
-                        "name": "order_by",
+                        "description": "id, name, group, createdAt, updatedAt",
+                        "name": "sort",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Sort direction",
-                        "name": "sort_direction",
+                        "description": "asc or desc",
+                        "name": "sortDirection",
                         "in": "query"
                     }
                 ],
@@ -927,13 +680,43 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/utils.PaginatedData-permissions_PermissionList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -944,6 +727,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Creates one permission per entry in name, stored as \"\u003cgroup\u003e \u003cname\u003e\". Requires 'permission create' permission.",
                 "consumes": [
                     "application/json"
                 ],
@@ -951,12 +735,366 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "roles"
+                    "Settings/Permissions"
+                ],
+                "summary": "Create permissions",
+                "parameters": [
+                    {
+                        "description": "Group and actions",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/permissions.CreatePermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/permissions/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Requires 'permission detail' permission.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings/Permissions"
+                ],
+                "summary": "Permission detail",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Permission ID (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/permissions.PermissionList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Hard delete; role grants cascade. Requires 'permission delete' permission.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings/Permissions"
+                ],
+                "summary": "Delete permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Permission ID (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "name is stored verbatim, so send the full \"\u003cgroup\u003e \u003caction\u003e\" string. Requires 'permission edit' permission.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings/Permissions"
+                ],
+                "summary": "Update permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Permission ID (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Permission",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/permissions.UpdatePermissionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/roles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Requires 'role list' permission. Filters: filter[name], filter[createdAt], filter[updatedAt] (YYYY-MM-DD or start,end).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings/Roles"
+                ],
+                "summary": "List roles",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Page (\u003e= 1)",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size (1-100)",
+                        "name": "perPage",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Search name",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "id, name, createdAt, updatedAt",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "asc or desc",
+                        "name": "sortDirection",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/utils.PaginatedData-roles_RoleList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Requires 'role create' permission.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings/Roles"
                 ],
                 "summary": "Create role",
                 "parameters": [
                     {
-                        "description": "Role data",
+                        "description": "Role",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -969,19 +1107,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/roles.RoleResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
@@ -990,33 +1122,40 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.Response"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/roles/{id}": {
+        "/settings/roles/{id}": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
+                "description": "Every permission, grouped, with isAssigned for this role. Requires 'role detail' permission.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "roles"
+                    "Settings/Roles"
                 ],
-                "summary": "Get role by ID",
+                "summary": "Role detail",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Role ID",
+                        "description": "Role ID (uuid)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1034,7 +1173,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/roles.RoleResponse"
+                                            "$ref": "#/definitions/roles.RoleDetail"
                                         }
                                     }
                                 }
@@ -1047,10 +1186,22 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.Response"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -1061,28 +1212,38 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Hard delete; assignments cascade. Requires 'role delete' permission. The superuser role cannot be deleted.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "roles"
+                    "Settings/Roles"
                 ],
                 "summary": "Delete role",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Role ID",
+                        "description": "Role ID (uuid)",
                         "name": "id",
                         "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
                         }
@@ -1091,6 +1252,12 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -1101,6 +1268,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Replace a role's name and permissions. Requires 'role edit' permission. The superuser role cannot be renamed.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1108,19 +1276,19 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "roles"
+                    "Settings/Roles"
                 ],
                 "summary": "Update role",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Role ID",
+                        "description": "Role ID (uuid)",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Role data",
+                        "description": "Role",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -1133,23 +1301,23 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/roles.RoleResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
                         }
@@ -1163,130 +1331,160 @@ const docTemplate = `{
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/roles/{id}/permissions": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "roles"
-                ],
-                "summary": "Sync role permissions",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Role ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Permission IDs",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/roles.SyncPermissionsRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/roles.RoleResponse"
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    },
-                    "422": {
-                        "description": "Unprocessable Entity",
-                        "schema": {
-                            "$ref": "#/definitions/utils.Response"
-                        }
-                    }
-                }
-            }
-        },
-        "/users": {
+        "/settings/select-options/permissions": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
+                "description": "Every permission grouped by group. Requires the 'superuser' role.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "Settings/Select Options"
+                ],
+                "summary": "Permission options",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/selectoptions.PermissionGroupOption"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/select-options/roles": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Every role except superuser, ordered by name. Requires the 'superuser' role.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings/Select Options"
+                ],
+                "summary": "Role options",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/selectoptions.RoleOption"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Paginated list of live users. Requires 'user list' permission. Filters: filter[status] (comma list of active,inactive,suspended,blocked), filter[name], filter[email], filter[roleId] (comma list of uuids), filter[createdAt], filter[updatedAt] (YYYY-MM-DD or start,end).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings/Users"
                 ],
                 "summary": "List users",
                 "parameters": [
                     {
                         "type": "integer",
-                        "description": "Page",
+                        "description": "Page (\u003e= 1)",
                         "name": "page",
                         "in": "query"
                     },
                     {
                         "type": "integer",
-                        "description": "Per page",
-                        "name": "per_page",
+                        "description": "Page size (1-100)",
+                        "name": "perPage",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Search",
+                        "description": "Search name, email, status",
                         "name": "search",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Order by",
-                        "name": "order_by",
+                        "description": "id, name, email, status, createdAt, updatedAt",
+                        "name": "sort",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "Sort direction",
-                        "name": "sort_direction",
+                        "description": "asc or desc",
+                        "name": "sortDirection",
                         "in": "query"
                     }
                 ],
@@ -1294,13 +1492,43 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/utils.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/utils.PaginatedData-users_UserList"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -1311,6 +1539,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Requires 'user create' permission. Only a superuser may assign the superuser role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1318,12 +1547,12 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "Settings/Users"
                 ],
                 "summary": "Create user",
                 "parameters": [
                     {
-                        "description": "User data",
+                        "description": "User",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -1336,19 +1565,13 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/users.UserResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
@@ -1357,33 +1580,40 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.Response"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/users/{id}": {
+        "/settings/users/{id}": {
             "get": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
+                "description": "Requires 'user detail' permission.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "Settings/Users"
                 ],
-                "summary": "Get user by ID",
+                "summary": "User detail",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "User ID",
+                        "description": "User ID (uuid)",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -1401,7 +1631,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/users.UserResponse"
+                                            "$ref": "#/definitions/users.UserDetail"
                                         }
                                     }
                                 }
@@ -1414,10 +1644,22 @@ const docTemplate = `{
                             "$ref": "#/definitions/utils.Response"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -1428,28 +1670,38 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Soft delete. Requires 'user delete' permission. Only a superuser may delete a superuser account.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "Settings/Users"
                 ],
                 "summary": "Delete user",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "User ID",
+                        "description": "User ID (uuid)",
                         "name": "id",
                         "in": "path",
                         "required": true
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
                         }
@@ -1458,6 +1710,12 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -1468,6 +1726,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Full replace of name, email, status, remark, roleIds. Requires 'user edit' permission. Only a superuser may modify a superuser account or assign the superuser role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1475,19 +1734,19 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "Settings/Users"
                 ],
                 "summary": "Update user",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "User ID",
+                        "description": "User ID (uuid)",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "User data",
+                        "description": "User",
                         "name": "body",
                         "in": "body",
                         "required": true,
@@ -1500,23 +1759,23 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/users.UserResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
                         }
@@ -1530,19 +1789,20 @@ const docTemplate = `{
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
-                            "$ref": "#/definitions/utils.Response"
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
             }
         },
-        "/users/{id}/roles": {
+        "/settings/users/{id}/reset-password": {
             "post": {
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
+                "description": "Requires the 'superuser' role.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1550,24 +1810,24 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "users"
+                    "Settings/Users"
                 ],
-                "summary": "Sync user roles",
+                "summary": "Reset a user's password",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "User ID",
+                        "description": "User ID (uuid)",
                         "name": "id",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "Role IDs",
+                        "description": "New password",
                         "name": "body",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/users.SyncRolesRequest"
+                            "$ref": "#/definitions/users.ResetPasswordRequest"
                         }
                     }
                 ],
@@ -1575,23 +1835,23 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/utils.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/definitions/users.UserResponse"
-                                        }
-                                    }
-                                }
-                            ]
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/utils.Response"
                         }
@@ -1605,7 +1865,129 @@ const docTemplate = `{
                     "422": {
                         "description": "Unprocessable Entity",
                         "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/users/{id}/send-reset-password-email": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Requires 'user create' permission.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings/Users"
+                ],
+                "summary": "Send a password reset email to a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
                             "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/settings/users/{id}/send-verification-email": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Requires 'user create' permission.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Settings/Users"
+                ],
+                "summary": "Send a verification email to a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID (uuid)",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/utils.Response"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
                         }
                     }
                 }
@@ -1613,14 +1995,15 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "auth.ForgotPasswordRequest": {
+        "auth.EmailRequest": {
             "type": "object",
             "required": [
                 "email"
             ],
             "properties": {
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255
                 }
             }
         },
@@ -1635,17 +2018,44 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                 }
             }
         },
-        "auth.RefreshTokenRequest": {
+        "auth.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "accessToken": {
+                    "type": "string"
+                },
+                "refreshToken": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/repositories.UserInformation"
+                }
+            }
+        },
+        "auth.RefreshRequest": {
             "type": "object",
             "required": [
-                "refresh_token"
+                "refreshToken"
             ],
             "properties": {
-                "refresh_token": {
+                "refreshToken": {
+                    "type": "string",
+                    "minLength": 1
+                }
+            }
+        },
+        "auth.RefreshResponse": {
+            "type": "object",
+            "properties": {
+                "accessToken": {
+                    "type": "string"
+                },
+                "refreshToken": {
                     "type": "string"
                 }
             }
@@ -1653,22 +2063,19 @@ const docTemplate = `{
         "auth.RegisterRequest": {
             "type": "object",
             "required": [
-                "confirm_password",
                 "email",
                 "name",
                 "password"
             ],
             "properties": {
-                "confirm_password": {
-                    "type": "string"
-                },
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255
                 },
                 "name": {
                     "type": "string",
                     "maxLength": 255,
-                    "minLength": 2
+                    "minLength": 1
                 },
                 "password": {
                     "type": "string",
@@ -1679,208 +2086,189 @@ const docTemplate = `{
         "auth.ResetPasswordRequest": {
             "type": "object",
             "required": [
-                "confirm_password",
-                "password",
+                "newPassword",
                 "token"
             ],
             "properties": {
-                "confirm_password": {
-                    "type": "string"
-                },
-                "password": {
+                "newPassword": {
                     "type": "string",
                     "minLength": 8
                 },
                 "token": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1
                 }
             }
         },
-        "auth.TokenResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string"
-                },
-                "refresh_token": {
-                    "type": "string"
-                },
-                "token_type": {
-                    "type": "string"
-                }
-            }
-        },
-        "auth.UserResponse": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "auth.VerifyEmailRequest": {
+        "auth.TokenRequest": {
             "type": "object",
             "required": [
                 "token"
             ],
             "properties": {
                 "token": {
-                    "type": "string"
-                }
-            }
-        },
-        "permissions.PermissionRequest": {
-            "type": "object",
-            "required": [
-                "modules",
-                "name"
-            ],
-            "properties": {
-                "modules": {
                     "type": "string",
-                    "maxLength": 255,
-                    "minLength": 2
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 2
+                    "minLength": 1
                 }
             }
         },
-        "permissions.PermissionResponse": {
+        "errors.FieldError": {
             "type": "object",
             "properties": {
-                "created_at": {
+                "field": {
                     "type": "string"
                 },
-                "id": {
-                    "type": "string"
-                },
-                "modules": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "updated_at": {
+                "message": {
                     "type": "string"
                 }
             }
         },
-        "profile.ChangePasswordRequest": {
-            "type": "object",
-            "required": [
-                "confirm_password",
-                "current_password",
-                "password"
-            ],
-            "properties": {
-                "confirm_password": {
-                    "type": "string"
-                },
-                "current_password": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 8
-                }
-            }
-        },
-        "profile.ProfileResponse": {
+        "health.HealthResponse": {
             "type": "object",
             "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "email_verified_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "roles": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/profile.RoleItem"
-                    }
+                "services": {
+                    "$ref": "#/definitions/health.HealthServices"
                 },
                 "status": {
                     "type": "string"
+                },
+                "timestamp": {
+                    "type": "string"
                 }
             }
         },
-        "profile.RoleItem": {
+        "health.HealthServices": {
             "type": "object",
             "properties": {
+                "database": {
+                    "type": "string"
+                },
+                "redis": {
+                    "type": "string"
+                }
+            }
+        },
+        "health.HomeResponse": {
+            "type": "object",
+            "properties": {
+                "appEnv": {
+                    "type": "string"
+                },
+                "appName": {
+                    "type": "string"
+                },
+                "date": {
+                    "type": "string"
+                }
+            }
+        },
+        "health.LiveResponse": {
+            "type": "object",
+            "properties": {
+                "alive": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "permissions.CreatePermissionRequest": {
+            "type": "object",
+            "required": [
+                "group",
+                "name"
+            ],
+            "properties": {
+                "group": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1
+                },
+                "name": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "permissions.PermissionList": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "group": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
                 "name": {
                     "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "permissions.UpdatePermissionRequest": {
+            "type": "object",
+            "required": [
+                "group",
+                "name"
+            ],
+            "properties": {
+                "group": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1
+                }
+            }
+        },
+        "profile.UpdatePasswordRequest": {
+            "type": "object",
+            "required": [
+                "currentPassword",
+                "newPassword"
+            ],
+            "properties": {
+                "currentPassword": {
+                    "type": "string",
+                    "minLength": 1
+                },
+                "newPassword": {
+                    "type": "string",
+                    "minLength": 8
                 }
             }
         },
         "profile.UpdateProfileRequest": {
             "type": "object",
             "required": [
+                "email",
                 "name"
             ],
             "properties": {
+                "email": {
+                    "type": "string",
+                    "maxLength": 255
+                },
                 "name": {
                     "type": "string",
                     "maxLength": 255,
-                    "minLength": 2
+                    "minLength": 1
                 }
             }
         },
-        "roles.PermissionItem": {
+        "repositories.UserInformation": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "modules": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "roles.RoleRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "name": {
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 2
-                }
-            }
-        },
-        "roles.RoleResponse": {
-            "type": "object",
-            "properties": {
-                "created_at": {
+                "email": {
                     "type": "string"
                 },
                 "id": {
@@ -1892,26 +2280,141 @@ const docTemplate = `{
                 "permissions": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/roles.PermissionItem"
+                        "type": "string"
                     }
                 },
-                "updated_at": {
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "roles.PermissionAssignment": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "isAssigned": {
+                    "type": "boolean"
+                },
+                "name": {
                     "type": "string"
                 }
             }
         },
-        "roles.SyncPermissionsRequest": {
+        "roles.PermissionGroup": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string"
+                },
+                "names": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/roles.PermissionAssignment"
+                    }
+                }
+            }
+        },
+        "roles.RoleDetail": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/roles.PermissionGroup"
+                    }
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "roles.RoleList": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "roles.RoleRequest": {
             "type": "object",
             "required": [
-                "permission_ids"
+                "name",
+                "permissionIds"
             ],
             "properties": {
-                "permission_ids": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 1
+                },
+                "permissionIds": {
                     "type": "array",
-                    "minItems": 1,
                     "items": {
                         "type": "string"
                     }
+                }
+            }
+        },
+        "selectoptions.PermissionGroupOption": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string"
+                },
+                "permissions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/selectoptions.PermissionOption"
+                    }
+                }
+            }
+        },
+        "selectoptions.PermissionOption": {
+            "type": "object",
+            "properties": {
+                "group": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "selectoptions.RoleOption": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
                 }
             }
         },
@@ -1921,31 +2424,57 @@ const docTemplate = `{
                 "email",
                 "name",
                 "password",
+                "roleIds",
                 "status"
             ],
             "properties": {
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255
                 },
                 "name": {
                     "type": "string",
                     "maxLength": 255,
-                    "minLength": 2
+                    "minLength": 1
                 },
                 "password": {
                     "type": "string",
                     "minLength": 8
                 },
+                "remark": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "roleIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "status": {
                     "type": "string",
                     "enum": [
                         "active",
-                        "inactive"
+                        "inactive",
+                        "suspended",
+                        "blocked"
                     ]
                 }
             }
         },
-        "users.RoleItem": {
+        "users.ResetPasswordRequest": {
+            "type": "object",
+            "required": [
+                "newPassword"
+            ],
+            "properties": {
+                "newPassword": {
+                    "type": "string",
+                    "minLength": 8
+                }
+            }
+        },
+        "users.RoleOption": {
             "type": "object",
             "properties": {
                 "id": {
@@ -1953,21 +2482,6 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
-                }
-            }
-        },
-        "users.SyncRolesRequest": {
-            "type": "object",
-            "required": [
-                "role_ids"
-            ],
-            "properties": {
-                "role_ids": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "string"
-                    }
                 }
             }
         },
@@ -1976,36 +2490,50 @@ const docTemplate = `{
             "required": [
                 "email",
                 "name",
+                "roleIds",
                 "status"
             ],
             "properties": {
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 255
                 },
                 "name": {
                     "type": "string",
                     "maxLength": 255,
-                    "minLength": 2
+                    "minLength": 1
+                },
+                "remark": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "roleIds": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "status": {
                     "type": "string",
                     "enum": [
                         "active",
-                        "inactive"
+                        "inactive",
+                        "suspended",
+                        "blocked"
                     ]
                 }
             }
         },
-        "users.UserResponse": {
+        "users.UserDetail": {
             "type": "object",
             "properties": {
-                "created_at": {
+                "createdAt": {
                     "type": "string"
                 },
                 "email": {
                     "type": "string"
                 },
-                "email_verified_at": {
+                "emailVerifiedAt": {
                     "type": "string"
                 },
                 "id": {
@@ -2014,17 +2542,128 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "remark": {
+                    "type": "string"
+                },
                 "roles": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/users.RoleItem"
+                        "$ref": "#/definitions/users.RoleOption"
                     }
                 },
                 "status": {
                     "type": "string"
                 },
-                "updated_at": {
+                "updatedAt": {
                     "type": "string"
+                }
+            }
+        },
+        "users.UserList": {
+            "type": "object",
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "remark": {
+                    "type": "string"
+                },
+                "roles": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "utils.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "errors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/errors.FieldError"
+                    }
+                },
+                "message": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "success": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "utils.PaginatedData-permissions_PermissionList": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/permissions.PermissionList"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/utils.PaginationMeta"
+                }
+            }
+        },
+        "utils.PaginatedData-roles_RoleList": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/roles.RoleList"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/utils.PaginationMeta"
+                }
+            }
+        },
+        "utils.PaginatedData-users_UserList": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/users.UserList"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/utils.PaginationMeta"
+                }
+            }
+        },
+        "utils.PaginationMeta": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "totalCount": {
+                    "type": "integer"
                 }
             }
         },
@@ -2036,7 +2675,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "status": {
-                    "type": "string"
+                    "type": "integer"
                 },
                 "success": {
                     "type": "boolean"
@@ -2056,7 +2695,7 @@ const docTemplate = `{
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
 	Version:          "1.0",
-	Host:             "localhost:8080",
+	Host:             "localhost:3000",
 	BasePath:         "/",
 	Schemes:          []string{},
 	Title:            "Clean Go Fiber API",

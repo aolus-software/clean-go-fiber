@@ -2,15 +2,20 @@ package permissions
 
 import "time"
 
-type PermissionRequest struct {
-	Name    string `json:"name" validate:"required,min=2,max=255"`
-	Modules string `json:"modules" validate:"required,min=2,max=255"`
+type CreatePermissionRequest struct {
+	Name  []string `json:"name" validate:"required,min=1,dive,required,min=1,max=255"`
+	Group string   `json:"group" validate:"required,min=1,max=100"`
 }
 
-type PermissionResponse struct {
+type UpdatePermissionRequest struct {
+	Name  string `json:"name" validate:"required,min=1,max=255"`
+	Group string `json:"group" validate:"required,min=1,max=100"`
+}
+
+type PermissionList struct {
 	ID        string    `json:"id"`
 	Name      string    `json:"name"`
-	Modules   string    `json:"modules"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Group     string    `json:"group"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }

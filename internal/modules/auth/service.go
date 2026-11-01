@@ -1,297 +1,306 @@
 package auth
 
 import (
-"context"
-"crypto/rand"
-"encoding/hex"
-"fmt"
-"time"
+	"context"
+	"errors"
+	"strings"
+	"sync"
+	"time"
 
-"github.com/aolus-software/clean-go-fiber/internal/config"
-"github.com/aolus-software/clean-go-fiber/internal/errors"
-"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
-"github.com/aolus-software/clean-go-fiber/internal/models"
-"github.com/aolus-software/clean-go-fiber/internal/queue/tasks"
-"github.com/aolus-software/clean-go-fiber/internal/repositories"
-"github.com/google/uuid"
-"github.com/hibiken/asynq"
-"gorm.io/gorm"
+	"github.com/aolus-software/clean-go-fiber/internal/config"
+	apperrors "github.com/aolus-software/clean-go-fiber/internal/errors"
+	"github.com/aolus-software/clean-go-fiber/internal/libs/cache"
+	"github.com/aolus-software/clean-go-fiber/internal/libs/txmanager"
+	"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
+	"github.com/aolus-software/clean-go-fiber/internal/models"
+	"github.com/aolus-software/clean-go-fiber/internal/repositories"
+	"github.com/google/uuid"
+	"go.uber.org/zap"
+	"gorm.io/gorm"
 )
 
 type Service interface {
-Register(ctx context.Context, req *RegisterRequest) (*TokenResponse, error)
-Login(ctx context.Context, req *LoginRequest) (*TokenResponse, error)
-RefreshToken(ctx context.Context, req *RefreshTokenRequest) (*TokenResponse, error)
-ForgotPassword(ctx context.Context, req *ForgotPasswordRequest) error
-ResetPassword(ctx context.Context, req *ResetPasswordRequest) error
-VerifyEmail(ctx context.Context, req *VerifyEmailRequest) error
-ResendVerification(ctx context.Context, req *ResendVerificationRequest) error
-Me(ctx context.Context, userID string) (*UserResponse, error)
+	Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error)
+	Register(ctx context.Context, req *RegisterRequest) error
+	ResendVerification(ctx context.Context, req *EmailRequest) error
+	VerifyEmail(ctx context.Context, req *TokenRequest) error
+	ForgotPassword(ctx context.Context, req *EmailRequest) error
+	ResetPassword(ctx context.Context, req *ResetPasswordRequest) error
+	Refresh(ctx context.Context, req *RefreshRequest) (*RefreshResponse, error)
 }
 
 type service struct {
-userRepo           repositories.UserRepository
-emailVerifyRepo    repositories.EmailVerificationRepository
-forgotPasswordRepo repositories.ForgotPasswordRepository
-queueClient        *asynq.Client
-cfg                *config.Config
+	userRepo        repositories.UserRepository
+	emailVerifyRepo repositories.EmailVerificationRepository
+	resetTokenRepo  repositories.PasswordResetTokenRepository
+	accountMail     *AccountMail
+	tx              *txmanager.TxManager
+	cache           *cache.Cache
+	cfg             *config.Config
+	log             *zap.Logger
 }
 
 func NewService(
-userRepo repositories.UserRepository,
-emailVerifyRepo repositories.EmailVerificationRepository,
-forgotPasswordRepo repositories.ForgotPasswordRepository,
-queueClient *asynq.Client,
-cfg *config.Config,
+	userRepo repositories.UserRepository,
+	emailVerifyRepo repositories.EmailVerificationRepository,
+	resetTokenRepo repositories.PasswordResetTokenRepository,
+	accountMail *AccountMail,
+	tx *txmanager.TxManager,
+	c *cache.Cache,
+	cfg *config.Config,
+	log *zap.Logger,
 ) Service {
-return &service{
-userRepo:           userRepo,
-emailVerifyRepo:    emailVerifyRepo,
-forgotPasswordRepo: forgotPasswordRepo,
-queueClient:        queueClient,
-cfg:                cfg,
-}
-}
-
-func (s *service) Register(ctx context.Context, req *RegisterRequest) (*TokenResponse, error) {
-existing, err := s.userRepo.FindByEmail(ctx, req.Email)
-if err != nil && err != gorm.ErrRecordNotFound {
-return nil, errors.NewInternalServerError("failed to check existing user")
-}
-if existing != nil {
-return nil, errors.NewConflictError("email already in use")
+	return &service{
+		userRepo:        userRepo,
+		emailVerifyRepo: emailVerifyRepo,
+		resetTokenRepo:  resetTokenRepo,
+		accountMail:     accountMail,
+		tx:              tx,
+		cache:           c,
+		cfg:             cfg,
+		log:             log,
+	}
 }
 
-hashed, err := utils.HashPassword(req.Password)
-if err != nil {
-return nil, errors.NewInternalServerError("failed to process password")
-}
-
-user := &models.User{
-Name:     req.Name,
-Email:    req.Email,
-Password: hashed,
-Status:   "active",
-}
-created, err := s.userRepo.Create(ctx, user)
-if err != nil {
-return nil, errors.NewInternalServerError("failed to create user")
-}
-
-token, err := generateSecureToken()
-if err != nil {
-return nil, errors.NewInternalServerError("failed to generate verification token")
-}
-
-ev := &models.EmailVerification{
-UserID:    created.ID,
-Token:     token,
-ExpiresIn: time.Now().Add(24 * time.Hour),
-}
-if _, err := s.emailVerifyRepo.Create(ctx, ev); err != nil {
-return nil, errors.NewInternalServerError("failed to create verification token")
-}
-
-task, err := tasks.NewEmailSendTask(tasks.EmailSendPayload{
-To:      created.Email,
-Subject: "Verify your email",
-Body:    fmt.Sprintf("Your verification token: %s", token),
+var dummyPasswordHash = sync.OnceValue(func() string {
+	hash, err := utils.HashPassword("timing-equaliser-not-a-real-password")
+	if err != nil {
+		return ""
+	}
+	return hash
 })
-if err == nil {
-s.queueClient.Enqueue(task, asynq.MaxRetry(3))
+
+func invalidCredentials() error {
+	return apperrors.NewBadRequestError("Invalid credentials", apperrors.Field("email", "Invalid email or password"))
 }
 
-return s.issueTokenPair(created)
+func invalidToken() error {
+	return apperrors.NewBadRequestError("Invalid token", apperrors.Field("token", "Invalid or expired token"))
 }
 
-func (s *service) Login(ctx context.Context, req *LoginRequest) (*TokenResponse, error) {
-user, err := s.userRepo.FindByEmail(ctx, req.Email)
-if err != nil {
-return nil, errors.NewUnauthorizedError("invalid credentials")
-}
-if !utils.CheckPasswordHash(req.Password, user.Password) {
-return nil, errors.NewUnauthorizedError("invalid credentials")
-}
-return s.issueTokenPair(user)
+func (s *service) Login(ctx context.Context, req *LoginRequest) (*LoginResponse, error) {
+	user, err := s.userRepo.FindLiveByEmail(ctx, strings.TrimSpace(req.Email), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	hash := dummyPasswordHash()
+	if user != nil {
+		hash = user.Password
+	}
+	passwordOK := utils.CheckPasswordHash(req.Password, hash)
+	if user == nil || !passwordOK {
+		return nil, invalidCredentials()
+	}
+	if user.EmailVerifiedAt == nil {
+		return nil, apperrors.NewBadRequestError("Email not verified", apperrors.Field("email", "Email address is not verified"))
+	}
+	if user.Status != models.UserStatusActive {
+		return nil, apperrors.NewBadRequestError("Account inactive", apperrors.Field("email", "Account is not active"))
+	}
+
+	info, err := s.userRepo.FindUserInformation(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if info == nil {
+		return nil, invalidCredentials()
+	}
+	if err := s.cache.Set(ctx, cache.Key(cache.UserInformationKey, user.ID.String()), info, cache.UserInformationTTL); err != nil {
+		return nil, err
+	}
+
+	access, refresh, err := s.issueTokens(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &LoginResponse{User: info, AccessToken: access, RefreshToken: refresh}, nil
 }
 
-func (s *service) RefreshToken(ctx context.Context, req *RefreshTokenRequest) (*TokenResponse, error) {
-claims, err := utils.ParseToken(req.RefreshToken, s.cfg.Jwt.RefreshSecretKey)
-if err != nil {
-return nil, errors.NewUnauthorizedError("invalid or expired refresh token")
+func (s *service) Register(ctx context.Context, req *RegisterRequest) error {
+	email := strings.TrimSpace(req.Email)
+	existing, err := s.userRepo.FindLiveByEmail(ctx, email, nil)
+	if err != nil {
+		return err
+	}
+	if existing != nil {
+		return emailTaken()
+	}
+
+	hashed, err := utils.HashPassword(req.Password)
+	if err != nil {
+		return err
+	}
+
+	user := &models.User{Name: req.Name, Email: email, Password: hashed, Status: models.UserStatusActive}
+	var rawToken string
+	err = s.tx.WithinTransaction(ctx, func(tx *gorm.DB) error {
+		if err := s.userRepo.WithTx(tx).Create(ctx, user); err != nil {
+			return err
+		}
+		rawToken, err = s.accountMail.IssueVerificationToken(ctx, tx, user.ID)
+		return err
+	})
+	if errors.Is(err, gorm.ErrDuplicatedKey) {
+		return emailTaken()
+	}
+	if err != nil {
+		return err
+	}
+
+	if err := s.accountMail.EnqueueVerification(ctx, user, rawToken); err != nil {
+		s.log.Error("failed to enqueue verification email", zap.String("userId", user.ID.String()), zap.Error(err))
+	}
+	return nil
 }
 
-user, err := s.userRepo.FindByEmail(ctx, claims.Email)
-if err != nil {
-return nil, errors.NewUnauthorizedError("user not found")
+func emailTaken() error {
+	return apperrors.NewUnprocessableEntityError("Validation error", apperrors.Field("email", "Email is already registered"))
 }
 
-return s.issueTokenPair(user)
+func (s *service) ResendVerification(ctx context.Context, req *EmailRequest) error {
+	user, err := s.userRepo.FindLiveByEmail(ctx, strings.TrimSpace(req.Email), nil)
+	if err != nil {
+		return err
+	}
+	if user == nil || user.EmailVerifiedAt != nil {
+		return nil
+	}
+	return s.accountMail.SendVerification(ctx, user)
 }
 
-func (s *service) ForgotPassword(ctx context.Context, req *ForgotPasswordRequest) error {
-user, err := s.userRepo.FindByEmail(ctx, req.Email)
-if err != nil {
-return nil
+func (s *service) VerifyEmail(ctx context.Context, req *TokenRequest) error {
+	now := time.Now().UTC()
+	record, err := s.emailVerifyRepo.FindUsable(ctx, utils.HashToken(req.Token), now)
+	if err != nil {
+		return err
+	}
+	if record == nil {
+		return invalidToken()
+	}
+	user, err := s.userRepo.FindByID(ctx, record.UserID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return invalidToken()
+	}
+
+	err = s.tx.WithinTransaction(ctx, func(tx *gorm.DB) error {
+		user.EmailVerifiedAt = &now
+		if err := s.userRepo.WithTx(tx).Update(ctx, user); err != nil {
+			return err
+		}
+		return s.emailVerifyRepo.WithTx(tx).MarkAllUsed(ctx, user.ID, now)
+	})
+	if err != nil {
+		return err
+	}
+	return s.cache.ForgetUsers(ctx, user.ID)
 }
 
-if err := s.forgotPasswordRepo.DeleteByUserID(ctx, user.ID); err != nil {
-return errors.NewInternalServerError("failed to process request")
-}
-
-token, err := generateSecureToken()
-if err != nil {
-return errors.NewInternalServerError("failed to generate token")
-}
-
-fp := &models.ForgotPassword{
-UserID:    user.ID,
-Token:     token,
-ExpiresAt: time.Now().Add(1 * time.Hour),
-}
-if _, err := s.forgotPasswordRepo.Create(ctx, fp); err != nil {
-return errors.NewInternalServerError("failed to create reset token")
-}
-
-task, err := tasks.NewEmailSendTask(tasks.EmailSendPayload{
-To:      user.Email,
-Subject: "Reset your password",
-Body:    fmt.Sprintf("Your password reset token: %s", token),
-})
-if err == nil {
-s.queueClient.Enqueue(task, asynq.MaxRetry(3))
-}
-
-return nil
+func (s *service) ForgotPassword(ctx context.Context, req *EmailRequest) error {
+	user, err := s.userRepo.FindLiveByEmail(ctx, strings.TrimSpace(req.Email), nil)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return nil
+	}
+	return s.accountMail.SendPasswordReset(ctx, user)
 }
 
 func (s *service) ResetPassword(ctx context.Context, req *ResetPasswordRequest) error {
-fp, err := s.forgotPasswordRepo.FindByToken(ctx, req.Token)
-if err != nil {
-return errors.NewBadRequestError("invalid or expired token")
-}
-if time.Now().After(fp.ExpiresAt) {
-return errors.NewBadRequestError("token has expired")
+	now := time.Now().UTC()
+	record, err := s.resetTokenRepo.FindUsable(ctx, utils.HashToken(req.Token), now)
+	if err != nil {
+		return err
+	}
+	if record == nil {
+		return invalidToken()
+	}
+	user, err := s.userRepo.FindByID(ctx, record.UserID)
+	if err != nil {
+		return err
+	}
+	if user == nil {
+		return invalidToken()
+	}
+
+	hashed, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		return err
+	}
+
+	err = s.tx.WithinTransaction(ctx, func(tx *gorm.DB) error {
+		user.Password = hashed
+		if err := s.userRepo.WithTx(tx).Update(ctx, user); err != nil {
+			return err
+		}
+		return s.resetTokenRepo.WithTx(tx).MarkAllUsed(ctx, user.ID, now)
+	})
+	if err != nil {
+		return err
+	}
+	return s.cache.RevokeSessions(ctx, user.ID)
 }
 
-user, err := s.userRepo.FindById(ctx, fp.UserID)
-if err != nil {
-return errors.NewNotFoundError("user not found")
+func (s *service) Refresh(ctx context.Context, req *RefreshRequest) (*RefreshResponse, error) {
+	claims, err := utils.ParseToken(req.RefreshToken, utils.TokenTypeRefresh, s.cfg.Jwt.RefreshSecret)
+	if err != nil {
+		return nil, apperrors.NewUnauthorizedError("Invalid or expired refresh token")
+	}
+	userID, err := uuid.Parse(claims.Subject)
+	if err != nil {
+		return nil, apperrors.NewUnauthorizedError("Invalid or expired refresh token")
+	}
+	storedID, err := s.cache.RefreshTokenID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if claims.ID == "" || storedID != claims.ID {
+		return nil, apperrors.NewUnauthorizedError("Invalid or expired refresh token")
+	}
+	info, err := s.userRepo.FindUserInformation(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if info == nil {
+		if err := s.cache.RevokeSessions(ctx, userID); err != nil {
+			return nil, err
+		}
+		return nil, apperrors.NewUnauthorizedError("Invalid or expired refresh token")
+	}
+	if err := s.cache.ForgetUsers(ctx, userID); err != nil {
+		return nil, err
+	}
+
+	access, refresh, err := s.issueTokens(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return &RefreshResponse{AccessToken: access, RefreshToken: refresh}, nil
 }
 
-hashed, err := utils.HashPassword(req.Password)
-if err != nil {
-return errors.NewInternalServerError("failed to process password")
-}
-user.Password = hashed
-
-if _, err := s.userRepo.Update(ctx, user); err != nil {
-return errors.NewInternalServerError("failed to update password")
-}
-
-return s.forgotPasswordRepo.DeleteByUserID(ctx, user.ID)
-}
-
-func (s *service) VerifyEmail(ctx context.Context, req *VerifyEmailRequest) error {
-ev, err := s.emailVerifyRepo.FindByToken(ctx, req.Token)
-if err != nil {
-return errors.NewBadRequestError("invalid or expired token")
-}
-if time.Now().After(ev.ExpiresIn) {
-return errors.NewBadRequestError("token has expired")
-}
-
-user, err := s.userRepo.FindById(ctx, ev.UserID)
-if err != nil {
-return errors.NewNotFoundError("user not found")
-}
-
-now := time.Now()
-user.EmailVerifiedAt = &now
-if _, err := s.userRepo.Update(ctx, user); err != nil {
-return errors.NewInternalServerError("failed to verify email")
-}
-
-return s.emailVerifyRepo.DeleteByUserID(ctx, user.ID)
-}
-
-func (s *service) ResendVerification(ctx context.Context, req *ResendVerificationRequest) error {
-user, err := s.userRepo.FindByEmail(ctx, req.Email)
-if err != nil {
-return nil
-}
-
-if user.EmailVerifiedAt != nil {
-return errors.NewBadRequestError("email already verified")
-}
-
-if err := s.emailVerifyRepo.DeleteByUserID(ctx, user.ID); err != nil {
-return errors.NewInternalServerError("failed to process request")
-}
-
-token, err := generateSecureToken()
-if err != nil {
-return errors.NewInternalServerError("failed to generate token")
-}
-
-ev := &models.EmailVerification{
-UserID:    user.ID,
-Token:     token,
-ExpiresIn: time.Now().Add(24 * time.Hour),
-}
-if _, err := s.emailVerifyRepo.Create(ctx, ev); err != nil {
-return errors.NewInternalServerError("failed to create verification token")
-}
-
-task, err := tasks.NewEmailSendTask(tasks.EmailSendPayload{
-To:      user.Email,
-Subject: "Verify your email",
-Body:    fmt.Sprintf("Your verification token: %s", token),
-})
-if err == nil {
-s.queueClient.Enqueue(task, asynq.MaxRetry(3))
-}
-
-return nil
-}
-
-func (s *service) Me(ctx context.Context, userID string) (*UserResponse, error) {
-id, err := uuid.Parse(userID)
-if err != nil {
-return nil, errors.NewBadRequestError("invalid user id")
-}
-user, err := s.userRepo.FindById(ctx, id)
-if err != nil {
-return nil, errors.NewNotFoundError("user not found")
-}
-return &UserResponse{
-ID:    user.ID.String(),
-Name:  user.Name,
-Email: user.Email,
-}, nil
-}
-
-func (s *service) issueTokenPair(user *models.User) (*TokenResponse, error) {
-userID := user.ID.String()
-accessToken, err := utils.GenerateAccessToken(userID, user.Email, s.cfg.Jwt.SecretKey, s.cfg.Jwt.ExpiresIn)
-if err != nil {
-return nil, errors.NewInternalServerError("failed to generate access token")
-}
-refreshToken, err := utils.GenerateRefreshToken(userID, user.Email, s.cfg.Jwt.RefreshSecretKey, s.cfg.Jwt.RefreshExpiresIn)
-if err != nil {
-return nil, errors.NewInternalServerError("failed to generate refresh token")
-}
-return &TokenResponse{
-AccessToken:  accessToken,
-RefreshToken: refreshToken,
-TokenType:    "Bearer",
-}, nil
-}
-
-func generateSecureToken() (string, error) {
-b := make([]byte, 32)
-if _, err := rand.Read(b); err != nil {
-return "", err
-}
-return hex.EncodeToString(b), nil
+/*
+The refresh token's jti is stored per user in Redis, so issuing a pair rotates out the previous
+refresh token and deleting the key revokes it.
+*/
+func (s *service) issueTokens(ctx context.Context, userID uuid.UUID) (string, string, error) {
+	access, err := utils.SignToken(userID.String(), utils.TokenTypeAccess, "", s.cfg.Jwt.Secret, config.AccessTokenLifetime)
+	if err != nil {
+		return "", "", err
+	}
+	tokenID, err := utils.GenerateSecureToken()
+	if err != nil {
+		return "", "", err
+	}
+	refresh, err := utils.SignToken(userID.String(), utils.TokenTypeRefresh, tokenID, s.cfg.Jwt.RefreshSecret, config.RefreshTokenLifetime)
+	if err != nil {
+		return "", "", err
+	}
+	if err := s.cache.Set(ctx, cache.Key(cache.RefreshTokenKey, userID.String()), tokenID, config.RefreshTokenLifetime); err != nil {
+		return "", "", err
+	}
+	return access, refresh, nil
 }

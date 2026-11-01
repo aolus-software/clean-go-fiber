@@ -2,43 +2,25 @@ package guards
 
 import (
 	"github.com/aolus-software/clean-go-fiber/internal/errors"
-	"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
-	"github.com/aolus-software/clean-go-fiber/internal/repositories"
+	"github.com/aolus-software/clean-go-fiber/internal/middleware"
+	"github.com/aolus-software/clean-go-fiber/internal/models"
 	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 )
 
-func RoleGuard(userRepo repositories.UserRepository, roles ...string) fiber.Handler {
+func Role(roles ...string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		claims, ok := c.Locals("claims").(*utils.Claims)
-		if !ok || claims == nil {
-			return errors.NewUnauthorizedError("unauthorized")
-		}
-
-		id, err := uuid.Parse(claims.UserID)
+		user, err := middleware.CurrentUser(c)
 		if err != nil {
-			return errors.NewUnauthorizedError("unauthorized")
+			return err
 		}
-
-		user, err := userRepo.FindById(c.Context(), id)
-		if err != nil {
-			return errors.NewUnauthorizedError("unauthorized")
+		if user.HasRole(models.SuperuserRole) {
+			return c.Next()
 		}
-
-		for _, role := range user.Roles {
-			if role.Name == "superuser" {
-				return c.Next()
-			}
-		}
-
 		for _, required := range roles {
-			for _, role := range user.Roles {
-				if role.Name == required {
-					return c.Next()
-				}
+			if !user.HasRole(required) {
+				return errors.NewForbiddenError("Forbidden")
 			}
 		}
-
-		return errors.NewForbiddenError("insufficient role")
+		return c.Next()
 	}
 }

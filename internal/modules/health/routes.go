@@ -2,7 +2,8 @@ package health
 
 import "github.com/gofiber/fiber/v2"
 
-func (h *Handler) RegisterRoutes(app *fiber.App) {
-	app.Get("/", h.Root)
-	app.Get("/health", h.Health)
+func (h *Handler) RegisterRoutes(router fiber.Router) {
+	router.Get("/", h.Root)
+	router.Get("/health", h.Health)
+	router.Get("/live", h.Live)
 }

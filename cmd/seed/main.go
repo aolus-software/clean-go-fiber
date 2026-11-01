@@ -9,7 +9,7 @@ import (
 )
 
 func main() {
-	config.Load()
+	config.LoadDatabaseOnly()
 
 	db, err := postgres.Connect()
 	if err != nil {

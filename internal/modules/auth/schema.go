@@ -1,47 +1,42 @@
 package auth
 
-type RegisterRequest struct {
-	Name            string `json:"name" validate:"required,min=2,max=255"`
-	Email           string `json:"email" validate:"required,email"`
-	Password        string `json:"password" validate:"required,min=8"`
-	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
-}
+import "github.com/aolus-software/clean-go-fiber/internal/repositories"
 
 type LoginRequest struct {
 	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Password string `json:"password" validate:"required,min=1"`
 }
 
-type RefreshTokenRequest struct {
-	RefreshToken string `json:"refresh_token" validate:"required"`
+type RegisterRequest struct {
+	Email    string `json:"email" validate:"required,email,max=255"`
+	Name     string `json:"name" validate:"required,min=1,max=255"`
+	Password string `json:"password" validate:"required,min=8,strongpassword"`
 }
 
-type ForgotPasswordRequest struct {
-	Email string `json:"email" validate:"required,email"`
+type EmailRequest struct {
+	Email string `json:"email" validate:"required,email,max=255"`
+}
+
+type TokenRequest struct {
+	Token string `json:"token" validate:"required,min=1"`
 }
 
 type ResetPasswordRequest struct {
-	Token           string `json:"token" validate:"required"`
-	Password        string `json:"password" validate:"required,min=8"`
-	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=Password"`
+	Token       string `json:"token" validate:"required,min=1"`
+	NewPassword string `json:"newPassword" validate:"required,min=8,strongpassword"`
 }
 
-type VerifyEmailRequest struct {
-	Token string `json:"token" validate:"required"`
+type RefreshRequest struct {
+	RefreshToken string `json:"refreshToken" validate:"required,min=1"`
 }
 
-type ResendVerificationRequest struct {
-	Email string `json:"email" validate:"required,email"`
+type LoginResponse struct {
+	User         *repositories.UserInformation `json:"user"`
+	AccessToken  string                        `json:"accessToken"`
+	RefreshToken string                        `json:"refreshToken"`
 }
 
-type TokenResponse struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token"`
-	TokenType    string `json:"token_type"`
-}
-
-type UserResponse struct {
-	ID    string `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+type RefreshResponse struct {
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
 }

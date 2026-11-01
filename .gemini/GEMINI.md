@@ -1,28 +1,16 @@
 # GEMINI.md — clean-go-fiber
 
-> You are working on a Go REST API boilerplate. Before writing any code, read the agent documentation below.
+You are working on a Go REST API starter (Fiber v2, GORM, golang-migrate, PostgreSQL, Redis, asynq).
 
-## Start Here
+## Start here
 
-1. Read `.agent/AGENTS.md` — project overview, architecture, file map, task patterns
-2. Read `.agent/rules/general.md` — coding rules you must always follow
-3. Read `.agent/skills/**/SKILL.md-fiber.md` — skill reference for all tech in this stack
+1. Read `CLAUDE.md` — project overview, commands, architecture, conventions.
+2. Read `.claude/rules/README.md` and the rules for the area you are changing. They are binding.
+3. Skills live in `.agents/skills/` (`go-fiber`, `golang-pro`, and the general bundle).
 
-## Your Responsibilities
+## Verification commands
 
-- Follow clean architecture strictly: handler → service → repository → model
-- Never skip layers, never put logic in handlers, never access DB outside repositories
-- Always validate input, always type errors, always use the response helpers
-- Every new handler must have complete swaggo annotations
-- Run `make docs` after changing handlers
-
-## Verification Commands
-
-- `make build` — verify the project compiles
-- `make lint` — run golangci-lint
-- `make docs` — regenerate Swagger docs
-- `make test` — run all tests
-
-## When in Doubt
-
-Check `.agent/AGENTS.md` section 7 (Common Task Patterns) and section 8 (File Reference Map) before creating any new file.
+- `make lint` — `gofmt -l` (must be empty) + `go vet ./...`
+- `go build ./...`
+- `make docs` — regenerate the swagger spec after changing handlers
+- `make test` — `go test ./...` (no tests exist yet)

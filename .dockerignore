@@ -3,8 +3,11 @@
 .env
 .air.toml
 tmp/
-docs/
+bin/
 *.md
-.agent/
+docs/*.md
+docs/*.yaml
+.agents/
 .claude/
 .gemini/
+.github/

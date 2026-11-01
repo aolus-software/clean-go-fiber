@@ -2,16 +2,14 @@ package permissions
 
 import (
 	"github.com/aolus-software/clean-go-fiber/internal/guards"
-	"github.com/aolus-software/clean-go-fiber/internal/middleware"
-	"github.com/aolus-software/clean-go-fiber/internal/repositories"
 	"github.com/gofiber/fiber/v2"
 )
 
-func (h *Handler) RegisterRoutes(router fiber.Router, userRepo repositories.UserRepository) {
-	r := router.Group("/permissions", middleware.Auth())
-	r.Get("/", guards.PermissionGuard(userRepo, "read"), h.List)
-	r.Post("/", guards.PermissionGuard(userRepo, "create"), h.Create)
-	r.Get("/:id", guards.PermissionGuard(userRepo, "read"), h.Get)
-	r.Patch("/:id", guards.PermissionGuard(userRepo, "update"), h.Update)
-	r.Delete("/:id", guards.PermissionGuard(userRepo, "delete"), h.Delete)
+func (h *Handler) RegisterRoutes(settings fiber.Router, auth fiber.Handler) {
+	r := settings.Group("/permissions", auth)
+	r.Get("", guards.Permission("permission list"), h.List)
+	r.Post("", guards.Permission("permission create"), h.Create)
+	r.Get("/:id", guards.Permission("permission detail"), h.Detail)
+	r.Patch("/:id", guards.Permission("permission edit"), h.Update)
+	r.Delete("/:id", guards.Permission("permission delete"), h.Delete)
 }

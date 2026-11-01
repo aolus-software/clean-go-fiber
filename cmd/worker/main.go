@@ -7,6 +7,7 @@ import (
 
 	"github.com/aolus-software/clean-go-fiber/internal/config"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/mailer"
+	"github.com/aolus-software/clean-go-fiber/internal/logging"
 	"github.com/aolus-software/clean-go-fiber/internal/worker"
 	"github.com/hibiken/asynq"
 	"go.uber.org/zap"
@@ -15,11 +16,11 @@ import (
 func main() {
 	config.Load()
 
-	log, _ := zap.NewProduction()
-	if config.C.App.Env == "development" {
-		log, _ = zap.NewDevelopment()
+	log, err := logging.New(config.C.App)
+	if err != nil {
+		panic(err)
 	}
-	defer log.Sync()
+	defer func() { _ = log.Sync() }()
 
 	m := mailer.New(&config.C.Mail)
 	srv := worker.NewServer(log)

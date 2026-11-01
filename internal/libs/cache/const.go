@@ -1,7 +1,9 @@
 package cache
 
+import "time"
+
 const (
-	UserByID    = "user:id:%s"
-	UserByEmail = "user:email:%s"
-	RoleByID    = "role:id:%s"
+	UserInformationKey = "user:%s"
+	UserInformationTTL = time.Hour
+	RefreshTokenKey    = "refresh:%s"
 )

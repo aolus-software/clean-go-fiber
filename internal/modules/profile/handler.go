@@ -1,9 +1,11 @@
 package profile
 
 import (
+	apperrors "github.com/aolus-software/clean-go-fiber/internal/errors"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
-	"github.com/aolus-software/clean-go-fiber/internal/libs/validator"
+	"github.com/aolus-software/clean-go-fiber/internal/middleware"
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -14,77 +16,80 @@ func NewHandler(service Service) *Handler {
 	return &Handler{service: service}
 }
 
-// @Summary     Get current user profile
-// @Tags        profile
+// @Summary     Get own profile
+// @Description Returns the caller's identity, roles, and permissions.
+// @Tags        Profile
 // @Produce     json
 // @Security    BearerAuth
-// @Success     200  {object}  utils.Response{data=profile.ProfileResponse}
+// @Success     200  {object}  utils.Response{data=repositories.UserInformation}
 // @Failure     401  {object}  utils.Response
-// @Router      /profile/me [get]
-func (h *Handler) GetProfile(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*utils.Claims)
-	result, err := h.service.GetProfile(c.Context(), claims.UserID)
+// @Router      /profile [get]
+func (h *Handler) Get(c *fiber.Ctx) error {
+	user, err := middleware.CurrentUser(c)
 	if err != nil {
 		return err
 	}
-	return utils.OK(c, result)
+	return utils.OK(c, "Profile retrieved", user)
 }
 
-// @Summary     Update current user profile
-// @Tags        profile
+// @Summary     Update own profile
+// @Tags        Profile
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       body  body      profile.UpdateProfileRequest  true  "Profile data"
-// @Success     200   {object}  utils.Response{data=profile.ProfileResponse}
-// @Failure     400   {object}  utils.Response
+// @Param       body  body      profile.UpdateProfileRequest  true  "Profile"
+// @Success     200   {object}  utils.Response{data=repositories.UserInformation}
+// @Failure     400   {object}  utils.ErrorResponse
 // @Failure     401   {object}  utils.Response
-// @Failure     422   {object}  utils.Response
-// @Router      /profile/me [patch]
-func (h *Handler) UpdateProfile(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*utils.Claims)
+// @Failure     422   {object}  utils.ErrorResponse
+// @Router      /profile [patch]
+func (h *Handler) Update(c *fiber.Ctx) error {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
+		return err
+	}
 	var req UpdateProfileRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.ErrBadRequest
+	if err := utils.ParseBody(c, &req); err != nil {
+		return err
 	}
-	if err := validator.Validate(&req); err != nil {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"errors":  err,
-		})
+	userID, err := uuid.Parse(user.ID)
+	if err != nil {
+		return apperrors.NewUnauthorizedError("Unauthorized")
 	}
-	result, err := h.service.UpdateProfile(c.Context(), claims.UserID, &req)
+	result, err := h.service.Update(c.Context(), userID, &req)
 	if err != nil {
 		return err
 	}
-	return utils.OK(c, result)
+	return utils.OK(c, "Profile updated", result)
 }
 
-// @Summary     Change current user password
-// @Tags        profile
+// @Summary     Change own password
+// @Description Checks the current password, then stores the new one and clears the cached user information.
+// @Tags        Profile
 // @Accept      json
 // @Produce     json
 // @Security    BearerAuth
-// @Param       body  body      profile.ChangePasswordRequest  true  "Password change data"
+// @Param       body  body      profile.UpdatePasswordRequest  true  "Passwords"
 // @Success     200   {object}  utils.Response
-// @Failure     400   {object}  utils.Response
+// @Failure     400   {object}  utils.ErrorResponse
 // @Failure     401   {object}  utils.Response
-// @Failure     422   {object}  utils.Response
-// @Router      /profile/me/password [patch]
-func (h *Handler) ChangePassword(c *fiber.Ctx) error {
-	claims := c.Locals("claims").(*utils.Claims)
-	var req ChangePasswordRequest
-	if err := c.BodyParser(&req); err != nil {
-		return fiber.ErrBadRequest
-	}
-	if err := validator.Validate(&req); err != nil {
-		return c.Status(fiber.StatusUnprocessableEntity).JSON(fiber.Map{
-			"success": false,
-			"errors":  err,
-		})
-	}
-	if err := h.service.ChangePassword(c.Context(), claims.UserID, &req); err != nil {
+// @Failure     422   {object}  utils.ErrorResponse
+// @Router      /profile/password [patch]
+func (h *Handler) UpdatePassword(c *fiber.Ctx) error {
+	user, err := middleware.CurrentUser(c)
+	if err != nil {
 		return err
 	}
-	return utils.OK(c, fiber.Map{"message": "password changed"})
+	var req UpdatePasswordRequest
+	if err := utils.ParseBody(c, &req); err != nil {
+		return err
+	}
+	userID, err := uuid.Parse(user.ID)
+	if err != nil {
+		return apperrors.NewUnauthorizedError("Unauthorized")
+	}
+	if err := h.service.UpdatePassword(c.Context(), userID, &req); err != nil {
+		return err
+	}
+	return utils.OK(c, "Password updated", nil)
 }

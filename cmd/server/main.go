@@ -1,7 +1,7 @@
 // @title           Clean Go Fiber API
 // @version         1.0
 // @description     Production-ready Go REST API boilerplate
-// @host            localhost:8080
+// @host            localhost:3000
 // @BasePath        /
 // @securityDefinitions.apikey BearerAuth
 // @in              header
@@ -13,16 +13,17 @@ import (
 	"errors"
 	"os"
 	"os/signal"
-	"strings"
+	"strconv"
 	"syscall"
 	"time"
-
-	apperrors "github.com/aolus-software/clean-go-fiber/internal/errors"
 
 	"github.com/aolus-software/clean-go-fiber/internal/bootstrap"
 	"github.com/aolus-software/clean-go-fiber/internal/config"
 	"github.com/aolus-software/clean-go-fiber/internal/database/postgres"
 	redisdb "github.com/aolus-software/clean-go-fiber/internal/database/redis"
+	apperrors "github.com/aolus-software/clean-go-fiber/internal/errors"
+	"github.com/aolus-software/clean-go-fiber/internal/libs/utils"
+	"github.com/aolus-software/clean-go-fiber/internal/logging"
 	"github.com/aolus-software/clean-go-fiber/internal/middleware"
 	"github.com/aolus-software/clean-go-fiber/internal/queue"
 	"github.com/gofiber/fiber/v2"
@@ -37,11 +38,11 @@ import (
 func main() {
 	config.Load()
 
-	logger, _ := zap.NewProduction()
-	if config.C.App.Env == "development" {
-		logger, _ = zap.NewDevelopment()
+	logger, err := logging.New(config.C.App)
+	if err != nil {
+		panic(err)
 	}
-	defer logger.Sync()
+	defer func() { _ = logger.Sync() }()
 
 	db, err := postgres.Connect()
 	if err != nil {
@@ -61,50 +62,43 @@ func main() {
 	logger.Info("Connected to Redis")
 
 	queueClient := queue.NewClient()
-	defer queueClient.Close()
+	defer func() { _ = queueClient.Close() }()
 
 	app := fiber.New(fiber.Config{
+		AppName:      config.C.App.Name,
 		BodyLimit:    100 * 1024,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
-		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			code := fiber.StatusInternalServerError
-			var appErr *apperrors.AppError
-			if errors.As(err, &appErr) {
-				code = appErr.Code
-			} else if e, ok := err.(*fiber.Error); ok {
-				code = e.Code
-			}
-			return c.Status(code).JSON(fiber.Map{
-				"success": false,
-				"message": err.Error(),
-			})
-		},
+		ErrorHandler: errorHandler(logger),
 	})
 
 	app.Use(recover.New())
 	app.Use(requestid.New())
 	app.Use(helmet.New())
 	app.Use(cors.New(cors.Config{
-		AllowOrigins: strings.Join(config.C.Cors.Host, ","),
+		AllowOrigins: config.C.Cors.AllowedOrigins,
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
-		AllowMethods: strings.Join(config.C.Cors.Method, ","),
+		AllowMethods: "GET,POST,PATCH,DELETE,HEAD,OPTIONS",
 	}))
 	app.Use(limiter.New(limiter.Config{
 		Max:        100,
 		Expiration: 1 * time.Minute,
+		LimitReached: func(c *fiber.Ctx) error {
+			return utils.Error(c, fiber.StatusTooManyRequests, "Too many requests", nil)
+		},
 	}))
 	app.Use(middleware.Logger(logger))
 	app.Use(middleware.Performance(logger, 1*time.Second))
 
-	bootstrap.RegisterRoutes(app, db, redisClient, queueClient, config.C)
+	bootstrap.RegisterRoutes(app, db, redisClient, queueClient, config.C, logger)
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 
 	go func() {
-		logger.Info("Service running", zap.String("port", config.C.App.Port))
-		if err := app.Listen(":" + config.C.App.Port); err != nil {
+		port := strconv.Itoa(config.C.App.Port)
+		logger.Info("Service running", zap.String("port", port))
+		if err := app.Listen(":" + port); err != nil {
 			logger.Fatal("Server error", zap.Error(err))
 		}
 	}()
@@ -115,4 +109,33 @@ func main() {
 		logger.Fatal("Server forced to shutdown", zap.Error(err))
 	}
 	logger.Info("Server stopped")
+}
+
+func errorHandler(logger *zap.Logger) fiber.ErrorHandler {
+	return func(c *fiber.Ctx, err error) error {
+		var appErr *apperrors.AppError
+		if errors.As(err, &appErr) {
+			return utils.Error(c, appErr.Code, appErr.Message, appErr.Errors)
+		}
+
+		var fiberErr *fiber.Error
+		if errors.As(err, &fiberErr) {
+			switch fiberErr.Code {
+			case fiber.StatusNotFound:
+				return utils.Error(c, fiber.StatusNotFound, "Route not found", nil)
+			case fiber.StatusBadRequest, fiber.StatusUnprocessableEntity:
+				return utils.Error(c, fiber.StatusBadRequest, "Invalid request body", []apperrors.FieldError{apperrors.Field("body", "request body could not be parsed")})
+			}
+			if fiberErr.Code < fiber.StatusInternalServerError {
+				return utils.Error(c, fiberErr.Code, fiberErr.Message, nil)
+			}
+		}
+
+		logger.Error("unhandled error",
+			zap.String("method", c.Method()),
+			zap.String("path", c.Path()),
+			zap.Error(err),
+		)
+		return utils.Error(c, fiber.StatusInternalServerError, "Internal server error", nil)
+	}
 }

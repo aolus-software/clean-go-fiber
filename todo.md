@@ -1,5 +1,7 @@
 # Clean Go Fiber - TODO List
 
+> Updated: 2026-10-31 (synced with the base contract: routes under `/settings`, `"<group> <action>"` permissions, E envelope, E env names)
+
 ## 🔴 High Priority
 
 ### Project Setup
@@ -27,12 +29,12 @@
 ### Configuration Management
 
 - [x] **Create `.env.example`**
-  - App: `APP_NAME`, `APP_PORT`, `APP_ENV`, `APP_KEY`, `APP_URL`
-  - JWT: `JWT_SECRET`, `JWT_EXPIRY`
-  - Database: `DATABASE_URL`, `DB_MAX_OPEN`, `DB_MAX_IDLE`
+  - App: `APP_NAME`, `APP_PORT`, `APP_ENV`, `APP_TIMEZONE`, `LOG_LEVEL`, `ENABLE_API_DOCS`, `CLIENT_URL`
+  - JWT: `JWT_SECRET`, `JWT_REFRESH_SECRET` (required; lifetimes hardcoded 1d / 7d)
+  - Database: `DATABASE_URL`
   - Redis: `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB`
-  - Mail: `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM`
-  - CORS: `CORS_ORIGIN`, `CORS_METHODS`
+  - Mail: `MAIL_HOST`, `MAIL_PORT`, `MAIL_SECURE`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM`
+  - CORS: `ALLOWED_HOST`
 
 - [x] **Implement config loading with validation**
   - `internal/config/` package
@@ -73,13 +75,13 @@
 ### Authentication Module
 
 - [x] **Implement auth routes + handlers**
-  - `POST /api/auth/login`
-  - `POST /api/auth/register`
-  - `POST /api/auth/verify-email`
-  - `POST /api/auth/resend-verification`
-  - `POST /api/auth/forgot-password`
-  - `POST /api/auth/reset-password`
-  - `POST /api/auth/refresh-token`
+  - `POST /auth/login`
+  - `POST /auth/register`
+  - `POST /auth/verify-email`
+  - `POST /auth/resend-verification`
+  - `POST /auth/forgot-password`
+  - `POST /auth/reset-password`
+  - `POST /auth/refresh`
 
 - [x] **Implement auth service**
   - Password hashing with bcrypt
@@ -104,39 +106,27 @@
 ### Profile & Settings Modules
 
 - [x] **Profile module**
-  - `GET /api/profile/me` — get current user
-  - `PATCH /api/profile/me` — update profile
-  - `PATCH /api/profile/me/password` — change password
+  - `GET /profile` — get current user
+  - `PATCH /profile` — update name and email
 
-- [x] **Permissions module** (`/permissions`)
-  - `GET /permissions` — list permissions
-  - `POST /permissions` — create permission
-  - `GET /permissions/:id` — get permission
-  - `PATCH /permissions/:id` — update permission
-  - `DELETE /permissions/:id` — delete permission
+- [x] **Permissions module** (`/settings/permissions`)
+  - list, create, detail, update, delete
 
-- [x] **Roles module** (`/roles`)
-  - `GET /roles` — list roles
-  - `POST /roles` — create role
-  - `GET /roles/:id` — get role
-  - `PATCH /roles/:id` — update role
-  - `DELETE /roles/:id` — delete role
-  - `POST /roles/:id/permissions` — sync permissions to role
+- [x] **Roles module** (`/settings/roles`)
+  - list, create, detail, update, delete (`permissionIds` in the body)
 
-- [x] **Users module** (`/users`)
-  - `GET /users` — list users
-  - `POST /users` — create user
-  - `GET /users/:id` — get user
-  - `PATCH /users/:id` — update user
-  - `DELETE /users/:id` — delete user
-  - `POST /users/:id/roles` — sync roles to user
+- [x] **Users module** (`/settings/users`)
+  - list, create, detail, update, delete (`roleIds` in the body)
+  - `reset-password` (superuser), `send-verification-email`, `send-reset-password-email`
+
+- [x] **Select options** (`/settings/select-options/permissions`, `/roles`)
 
 ### API Documentation
 
 - [x] **Set up Swagger/OpenAPI with swag**
   - Install `swaggo/swag` CLI
   - Add doc annotations to all handlers
-  - Serve Scalar-style UI or Swagger UI at `/docs`
+  - Serve Scalar UI at `/docs`, gated by `ENABLE_API_DOCS`
   - Document request/response schemas
   - Document Bearer auth security scheme
 
@@ -204,12 +194,10 @@
 
 ### Developer Experience
 
-- [x] **Create Makefile** (partial — missing build, start, lint, format, test, fresh)
-  - `make dev` — run with hot reload (air)
-  - `make dev-worker` — run worker
-  - `make seed` — seed database
-  - `make migrate-*` — migration commands
-  - `make docs` — generate swagger docs
+- [x] **Create Makefile**
+  - `make dev` / `dev-server` / `dev-worker`, `build`, `start`, `lint`, `format`, `test`, `docs`
+  - `make db-migrate` / `db-migrate-down` / `db-migrate-create` / `db-seed` / `fresh` / `reset`
+  - `make docker-*` suite
 
 - [x] **Hot reload with Air**
   - Install `cosmtrek/air`
@@ -239,6 +227,8 @@
 - [ ] **Set up golangci-lint**
   - `.golangci.yml` config
   - Rules: gofmt, govet, errcheck, staticcheck, gosec
+
+- [x] **CI workflow** (`.github/workflows/ci.yml`: lint, build, database)
 
 - [ ] **Set up pre-commit hooks**
   - Run lint + format before commit
@@ -282,9 +272,9 @@
 | Request ID                 |      ✅      |     ✅     |       ✅       |
 | Structured Logging         |      ✅      |     ✅     |       ✅       |
 | Performance Monitoring     |      ✅      |     ✅     |       ✅       |
-| DI Container               |      ✅      |     ✅     |       ✅       |
+| DI Container               |      ✅      |     ✅     |  manual (constructors)  |
 | Docker + docker-compose    |      ✅      |     ✅     |       ✅       |
-| Makefile                   |      ✅      |     ✅     |       🔶       |
+| Makefile                   |      ✅      |     ✅     |       ✅       |
 | Hot Reload (dev)           |      ✅      |     ✅     |       ✅       |
 | Env Validation             |      ✅      |     ✅     |       ✅       |
 | Unit Tests                 |      ❌      |     ❌     |       ⬜       |

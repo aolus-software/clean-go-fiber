@@ -3,44 +3,46 @@ package bootstrap
 import (
 	"github.com/aolus-software/clean-go-fiber/internal/config"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/cache"
+	"github.com/aolus-software/clean-go-fiber/internal/libs/txmanager"
+	"github.com/aolus-software/clean-go-fiber/internal/middleware"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/auth"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/docs"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/health"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/permissions"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/profile"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/roles"
+	"github.com/aolus-software/clean-go-fiber/internal/modules/selectoptions"
 	"github.com/aolus-software/clean-go-fiber/internal/modules/users"
 	"github.com/aolus-software/clean-go-fiber/internal/repositories"
 	"github.com/gofiber/fiber/v2"
 	"github.com/hibiken/asynq"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-func RegisterRoutes(app *fiber.App, db *gorm.DB, redisClient *redis.Client, queueClient *asynq.Client, cfg *config.Config) {
+func RegisterRoutes(app *fiber.App, db *gorm.DB, redisClient *redis.Client, queueClient *asynq.Client, cfg *config.Config, log *zap.Logger) {
 	c := cache.New(redisClient)
-
-	health.NewHandler(cfg).RegisterRoutes(app)
-	docs.NewHandler(cfg).RegisterRoutes(app)
+	tx := txmanager.New(db)
 
 	userRepo := repositories.NewUserRepository(db)
-	emailVerifyRepo := repositories.NewEmailVerificationRepository(db)
-	forgotPasswordRepo := repositories.NewForgotPasswordRepository(db)
 	roleRepo := repositories.NewRoleRepository(db)
 	permissionRepo := repositories.NewPermissionRepository(db)
+	emailVerifyRepo := repositories.NewEmailVerificationRepository(db)
+	resetTokenRepo := repositories.NewPasswordResetTokenRepository(db)
 
-	authService := auth.NewService(userRepo, emailVerifyRepo, forgotPasswordRepo, queueClient, cfg)
-	auth.NewHandler(authService).RegisterRoutes(app)
+	authMiddleware := middleware.Auth(userRepo, c)
+	accountMail := auth.NewAccountMail(emailVerifyRepo, resetTokenRepo, queueClient, tx, cfg)
 
-	profileService := profile.NewService(userRepo)
-	profile.NewHandler(profileService).RegisterRoutes(app)
+	health.NewHandler(cfg, db, c, log).RegisterRoutes(app)
+	docs.NewHandler(cfg).RegisterRoutes(app)
 
-	permissionsService := permissions.NewService(permissionRepo, c)
-	permissions.NewHandler(permissionsService).RegisterRoutes(app, userRepo)
+	auth.NewHandler(auth.NewService(userRepo, emailVerifyRepo, resetTokenRepo, accountMail, tx, c, cfg, log)).RegisterRoutes(app)
+	profile.NewHandler(profile.NewService(userRepo, c)).RegisterRoutes(app, authMiddleware)
 
-	rolesService := roles.NewService(roleRepo, permissionRepo, c)
-	roles.NewHandler(rolesService).RegisterRoutes(app, userRepo)
-
-	usersService := users.NewService(userRepo, roleRepo, c)
-	users.NewHandler(usersService).RegisterRoutes(app, userRepo)
+	settings := app.Group("/settings")
+	users.NewHandler(users.NewService(userRepo, roleRepo, accountMail, tx, c, cfg)).RegisterRoutes(settings, authMiddleware)
+	roles.NewHandler(roles.NewService(roleRepo, permissionRepo, userRepo, tx, c, cfg)).RegisterRoutes(settings, authMiddleware)
+	permissions.NewHandler(permissions.NewService(permissionRepo, userRepo, c, cfg)).RegisterRoutes(settings, authMiddleware)
+	selectoptions.NewHandler(selectoptions.NewService(permissionRepo, roleRepo)).RegisterRoutes(settings, authMiddleware)
 }

@@ -2,10 +2,9 @@ package worker
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/aolus-software/clean-go-fiber/internal/config"
 	"github.com/aolus-software/clean-go-fiber/internal/libs/mailer"
+	"github.com/aolus-software/clean-go-fiber/internal/queue"
 	"github.com/aolus-software/clean-go-fiber/internal/queue/tasks"
 	"github.com/aolus-software/clean-go-fiber/internal/worker/handlers"
 	"github.com/hibiken/asynq"
@@ -13,12 +12,8 @@ import (
 )
 
 func NewServer(log *zap.Logger) *asynq.Server {
-	cfg := config.C.Redis
 	return asynq.NewServer(
-		asynq.RedisClientOpt{
-			Addr:     fmt.Sprintf("%s:%s", cfg.Host, cfg.Port),
-			Password: cfg.Password,
-		},
+		queue.RedisOpt(),
 		asynq.Config{
 			Concurrency: 10,
 			ErrorHandler: asynq.ErrorHandlerFunc(func(ctx context.Context, task *asynq.Task, err error) {
