@@ -5,6 +5,7 @@ import (
 	"os"
 	"slices"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -80,6 +81,18 @@ func getEnvPort(key string, fallback int) int {
 		log.Fatalf("Environment variable %s must be a port between 1 and 65535", key)
 	}
 	return p
+}
+
+func getEnvDuration(key string, fallback time.Duration) time.Duration {
+	v := os.Getenv(key)
+	if v == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d < 0 {
+		log.Fatalf("Environment variable %s must be a non-negative duration such as 30s or 5m", key)
+	}
+	return d
 }
 
 func getEnvBool(key string, fallback bool) bool {

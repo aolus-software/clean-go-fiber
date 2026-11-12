@@ -22,6 +22,9 @@ method takes `ctx context.Context` first.
   - role permissions, rename, or delete → every holder of the role;
   - permission edit or delete → every holder of a role that has it.
   A stale permission cache is a security defect, not a performance one.
+- **Select-option lists** (`select_options:permissions`, `select_options:roles`, 1 h via
+  `cache.Remember`) are dropped with `cache.ForgetSelectOptions` after every role or permission
+  create, update, and delete.
 - **Enqueueing** — after the transaction commits, never inside it. An enqueue failure is logged with
   zap and does not fail a request whose data was already committed (the user can ask for a resend).
 

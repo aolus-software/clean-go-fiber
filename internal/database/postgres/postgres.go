@@ -1,6 +1,8 @@
 package postgres
 
 import (
+	"log"
+	"os"
 	"time"
 
 	"github.com/aolus-software/clean-go-fiber/internal/config"
@@ -12,13 +14,22 @@ import (
 var DB *gorm.DB
 
 func Connect() (*gorm.DB, error) {
-	logLevel := logger.Silent
+	cfg := config.C.Database
+
+	logLevel := logger.Warn
 	if config.C.App.Env == "development" && config.C.App.LogLevel == "debug" {
 		logLevel = logger.Info
 	}
+	gormLogger := logger.New(log.New(os.Stdout, "\r\n", log.LstdFlags), logger.Config{
+		SlowThreshold:             cfg.SlowQuery,
+		LogLevel:                  logLevel,
+		IgnoreRecordNotFoundError: true,
+		ParameterizedQueries:      true,
+		Colorful:                  config.C.App.Env == "development",
+	})
 
-	db, err := gorm.Open(postgres.Open(config.C.Database.URL), &gorm.Config{
-		Logger:         logger.Default.LogMode(logLevel),
+	db, err := gorm.Open(postgres.Open(cfg.URL), &gorm.Config{
+		Logger:         gormLogger,
 		TranslateError: true,
 		NowFunc:        func() time.Time { return time.Now().UTC() },
 	})
@@ -31,9 +42,10 @@ func Connect() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	sqlDB.SetMaxOpenConns(25)
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetConnMaxLifetime(5 * time.Minute)
+	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(cfg.ConnMaxIdleTime)
 
 	DB = db
 

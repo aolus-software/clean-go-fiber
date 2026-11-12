@@ -92,7 +92,10 @@ func (s *service) Create(ctx context.Context, req *CreatePermissionRequest) erro
 	if errors.Is(err, gorm.ErrDuplicatedKey) {
 		return namesTaken(names)
 	}
-	return err
+	if err != nil {
+		return err
+	}
+	return s.cache.ForgetSelectOptions(ctx)
 }
 
 func (s *service) Detail(ctx context.Context, id uuid.UUID) (*PermissionList, error) {
@@ -132,7 +135,10 @@ func (s *service) Update(ctx context.Context, id uuid.UUID, req *UpdatePermissio
 		}
 		return err
 	}
-	return s.forgetHolders(ctx, p.ID)
+	if err := s.forgetHolders(ctx, p.ID); err != nil {
+		return err
+	}
+	return s.cache.ForgetSelectOptions(ctx)
 }
 
 func (s *service) Delete(ctx context.Context, id uuid.UUID) error {
@@ -150,7 +156,10 @@ func (s *service) Delete(ctx context.Context, id uuid.UUID) error {
 	if err := s.permissionRepo.Delete(ctx, p.ID); err != nil {
 		return err
 	}
-	return s.cache.ForgetUsers(ctx, holders...)
+	if err := s.cache.ForgetUsers(ctx, holders...); err != nil {
+		return err
+	}
+	return s.cache.ForgetSelectOptions(ctx)
 }
 
 func (s *service) forgetHolders(ctx context.Context, permissionID uuid.UUID) error {

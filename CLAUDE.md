@@ -97,6 +97,12 @@ The service opens every transaction; repositories never do.
   `status = 'active' AND deleted_at IS NULL`. Every write that changes a user's status, roles,
   identity, password, or deletion — and every role/permission change, for all holders — drops the
   key.
+- **Select-option lists are cached** in Redis at `select_options:permissions` and
+  `select_options:roles` for 3600 s; every role or permission create, update, and delete drops both
+  (`cache.ForgetSelectOptions`).
+- **Pool and slow-query log are env-driven** (`DB_POOL_*`, `DB_SLOW_QUERY_MS`). GORM logs slow
+  statements and errors at warn in every environment, with parameters as placeholders; every
+  statement only in development with `LOG_LEVEL=debug`.
 - **Responses go through `internal/libs/utils/response.go`**; failures are returned as
   `*errors.AppError` and the central `ErrorHandler` builds the envelope. Unknown errors become a
   logged 500 with a fixed message — never `err.Error()`.

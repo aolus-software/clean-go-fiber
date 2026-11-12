@@ -100,3 +100,7 @@ func (c *Cache) ForgetUsers(ctx context.Context, ids ...uuid.UUID) error {
 	}
 	return c.Delete(ctx, keys...)
 }
+
+func (c *Cache) ForgetSelectOptions(ctx context.Context) error {
+	return c.Delete(ctx, PermissionSelectOptionsKey, RoleSelectOptionsKey)
+}

@@ -29,11 +29,11 @@ snake_case plural tables, snake_case columns, `uuid` primary keys defaulting to 
 
 | Table | Notes |
 | --- | --- |
-| `users` | `name`, `email`, `password` NOT NULL; `status user_status NOT NULL DEFAULT 'active'`; `remark varchar(255)` nullable; `email_verified_at`, `deleted_at` nullable. **No plain UNIQUE on email**: partial unique `users_email_unique_live (email) WHERE deleted_at IS NULL`, plus `users_email_deleted_at_status_index` |
+| `users` | `name`, `email`, `password` NOT NULL; `status user_status NOT NULL DEFAULT 'active'`; `remark varchar(255)` nullable; `email_verified_at`, `deleted_at` nullable. **No plain UNIQUE on email**: partial unique `users_email_unique_live (email) WHERE deleted_at IS NULL`, plus `users_email_deleted_at_status_index`; partial `users_created_at_live_index (created_at) WHERE deleted_at IS NULL` backs the default list sort |
 | `roles` | `name varchar(100)` UNIQUE (`roles_name_unique`); hard delete |
 | `permissions` | `name varchar(255)` UNIQUE (`permissions_name_unique`), stored as `"<group> <action>"`; `"group" varchar(100)`; hard delete |
-| `role_permissions` | PK `(role_id, permission_id)`, both FKs CASCADE |
-| `user_roles` | PK `(user_id, role_id)`, both FKs CASCADE, `assigned_at timestamp NOT NULL DEFAULT now()` |
+| `role_permissions` | PK `(role_id, permission_id)`, both FKs CASCADE; `role_permissions_permission_id_index` for holder lookups by permission |
+| `user_roles` | PK `(user_id, role_id)`, both FKs CASCADE, `assigned_at timestamp NOT NULL DEFAULT now()`; `user_roles_role_id_index` for holder lookups by role |
 | `email_verifications`, `password_reset_tokens` | `user_id` FK CASCADE; `token varchar(255)` UNIQUE (SHA-256 hex of the emailed token); `expired_at` NOT NULL; `used_at` nullable; index `(user_id, used_at)` |
 
 ## Enum

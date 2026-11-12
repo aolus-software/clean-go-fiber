@@ -3,6 +3,7 @@ services:
     image: postgres:18.3
     container_name: clean-go-postgres
     restart: unless-stopped
+    command: ["postgres", "-c", "log_min_duration_statement=${POSTGRES_SLOW_QUERY_MS:-100}"]
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
