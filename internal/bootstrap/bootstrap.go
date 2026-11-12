@@ -44,5 +44,5 @@ func RegisterRoutes(app *fiber.App, db *gorm.DB, redisClient *redis.Client, queu
 	users.NewHandler(users.NewService(userRepo, roleRepo, accountMail, tx, c, cfg)).RegisterRoutes(settings, authMiddleware)
 	roles.NewHandler(roles.NewService(roleRepo, permissionRepo, userRepo, tx, c, cfg)).RegisterRoutes(settings, authMiddleware)
 	permissions.NewHandler(permissions.NewService(permissionRepo, userRepo, c, cfg)).RegisterRoutes(settings, authMiddleware)
-	selectoptions.NewHandler(selectoptions.NewService(permissionRepo, roleRepo)).RegisterRoutes(settings, authMiddleware)
+	selectoptions.NewHandler(selectoptions.NewService(permissionRepo, roleRepo, c)).RegisterRoutes(settings, authMiddleware)
 }

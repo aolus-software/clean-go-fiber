@@ -3,6 +3,7 @@ package selectoptions
 import (
 	"context"
 
+	"github.com/aolus-software/clean-go-fiber/internal/libs/cache"
 	"github.com/aolus-software/clean-go-fiber/internal/repositories"
 )
 
@@ -14,13 +15,30 @@ type Service interface {
 type service struct {
 	permissionRepo repositories.PermissionRepository
 	roleRepo       repositories.RoleRepository
+	cache          *cache.Cache
 }
 
-func NewService(permissionRepo repositories.PermissionRepository, roleRepo repositories.RoleRepository) Service {
-	return &service{permissionRepo: permissionRepo, roleRepo: roleRepo}
+func NewService(permissionRepo repositories.PermissionRepository, roleRepo repositories.RoleRepository, c *cache.Cache) Service {
+	return &service{permissionRepo: permissionRepo, roleRepo: roleRepo, cache: c}
 }
 
 func (s *service) Permissions(ctx context.Context) ([]PermissionGroupOption, error) {
+	var groups []PermissionGroupOption
+	err := s.cache.Remember(ctx, cache.PermissionSelectOptionsKey, cache.SelectOptionsTTL, &groups, func() (any, error) {
+		return s.loadPermissions(ctx)
+	})
+	return groups, err
+}
+
+func (s *service) Roles(ctx context.Context) ([]RoleOption, error) {
+	var options []RoleOption
+	err := s.cache.Remember(ctx, cache.RoleSelectOptionsKey, cache.SelectOptionsTTL, &options, func() (any, error) {
+		return s.loadRoles(ctx)
+	})
+	return options, err
+}
+
+func (s *service) loadPermissions(ctx context.Context) ([]PermissionGroupOption, error) {
 	perms, err := s.permissionRepo.FindAllOrdered(ctx)
 	if err != nil {
 		return nil, err
@@ -36,7 +54,7 @@ func (s *service) Permissions(ctx context.Context) ([]PermissionGroupOption, err
 	return groups, nil
 }
 
-func (s *service) Roles(ctx context.Context) ([]RoleOption, error) {
+func (s *service) loadRoles(ctx context.Context) ([]RoleOption, error) {
 	roles, err := s.roleRepo.SelectOptions(ctx)
 	if err != nil {
 		return nil, err

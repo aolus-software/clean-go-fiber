@@ -16,6 +16,11 @@ environment, after loading `.env` if present (godotenv). Nothing else reads the 
 | `ENABLE_API_DOCS` | `false` | no | the only switch for `/docs` and `/docs/openapi.json`, independent of `APP_ENV`. `.env.example` sets `true` for local work; keep it off elsewhere |
 | `CLIENT_URL` | `http://localhost:3000` | no | base of the links in verification and reset mails |
 | `DATABASE_URL` | local placeholder | no | `postgres://user:pass@host:5432/db?sslmode=disable`; used by the server, seed, migrate, and the GORM connection |
+| `DB_POOL_MAX_OPEN` | `25` | no | max open connections per process; at least 1 |
+| `DB_POOL_MAX_IDLE` | `10` | no | max idle connections kept in the pool; capped at `DB_POOL_MAX_OPEN` |
+| `DB_POOL_CONN_MAX_LIFETIME` | `5m` | no | Go duration; a connection is closed after this age. `0` means no limit |
+| `DB_POOL_CONN_MAX_IDLE_TIME` | `0` | no | Go duration; an idle connection is closed after this long. `0` means no limit |
+| `DB_SLOW_QUERY_MS` | `200` | no | GORM logs a statement slower than this at warn level, with parameters as placeholders (never values); `0` disables. Query errors are logged too, except record-not-found. `APP_ENV=development` with `LOG_LEVEL=debug` still logs every statement |
 | `REDIS_HOST` | `localhost` | no | cache and queue |
 | `REDIS_PORT` | `6379` | no | |
 | `REDIS_PASSWORD` | empty | no | empty means no auth |
@@ -30,12 +35,13 @@ environment, after loading `.env` if present (godotenv). Nothing else reads the 
 | `JWT_REFRESH_SECRET` | — | **yes** | signs refresh tokens (7 days); must differ from `JWT_SECRET` |
 | `ALLOWED_HOST` | empty | no | CORS origins, comma-separated; empty allows `*` |
 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | — | compose only | read by the `postgres` service in `docker-compose.yml`; keep them consistent with `DATABASE_URL` |
+| `POSTGRES_SLOW_QUERY_MS` | `100` | compose only | `log_min_duration_statement` of the compose `postgres` service: statements slower than this many ms go to the container log; `-1` disables |
 
 Generate each secret with `openssl rand -hex 32`. A missing required variable stops the process at
 boot with the variable's name in the message.
 
 Hardcoded on purpose: token lifetimes (access 1 day, refresh 7 days, mail tokens 1 hour), the cache
-TTL (3600 s), and the rate limit (100 requests / 60 s per IP).
+TTLs (3600 s for `UserInformation` and the select-option lists), and the rate limit (100 requests / 60 s per IP).
 
 ## Compose hostnames
 
